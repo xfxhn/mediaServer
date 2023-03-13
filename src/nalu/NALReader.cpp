@@ -380,7 +380,6 @@ int NALReader::getVideoFrame(NALPicture *&picture, bool &flag) {
             uint8_t *buf = new uint8_t[tempSize]; // NOLINT(modernize-use-auto)
             memcpy(buf, data, tempSize);
 
-
             NALHeader::ebsp_to_rbsp(data, size);
             ReadStream rs(data, size);
 
@@ -421,6 +420,9 @@ int NALReader::getVideoFrame(NALPicture *&picture, bool &flag) {
 
             /*先处理上一帧，如果tag有数据并且first_mb_in_slice=0表示有上一针*/
             if (sliceHeader.first_mb_in_slice == 0 && picture->useFlag) {
+
+
+
                 /*计算pts和dts*/
                 computedTimestamp(picture);
 
@@ -528,6 +530,39 @@ int NALReader::test(NALPicture *&picture, bool &flag) {
     return 0;
 }
 
+static constexpr uint8_t startCode[4] = {0, 0, 0, 1};
+
+int NALReader::test1(NALPicture *&picture, uint8_t *data, uint32_t size) {
+    nalUnitHeader.nal_unit(data[0]);
+    if (nalUnitHeader.nal_unit_type == H264_NAL_SPS) {
+        /*去除防竞争字节*/
+        NALHeader::ebsp_to_rbsp(data, size);
+        ReadStream rs(data, size);
+
+        sps.seq_parameter_set_data(rs);
+        spsList[sps.seq_parameter_set_id] = sps;
+
+        picture->size += size;
+        picture->data.push_back({size, data, 0});
+    } else if (nalUnitHeader.nal_unit_type == H264_NAL_PPS) {
+        delete[] ppsData;
+        ppsData = new uint8_t[size];
+        memcpy(ppsData, data, size);
+        ppsSize = size;
+
+        NALHeader::ebsp_to_rbsp(data, size);
+        ReadStream rs(data, size);
+
+
+        pps.pic_parameter_set_rbsp(rs, spsList);
+        ppsList[pps.pic_parameter_set_id] = pps;
+
+        picture->size += size;
+        picture->data.push_back({size, data, 2});
+    }
+    return 0;
+}
+
 int NALReader::putNalUintData(NALPicture *&picture, uint8_t *data, uint32_t size) {
     int ret;
 
@@ -540,9 +575,19 @@ int NALReader::putNalUintData(NALPicture *&picture, uint8_t *data, uint32_t size
     /*读取nalu header*/
     nalUnitHeader.nal_unit(data[0]);
     if (nalUnitHeader.nal_unit_type == H264_NAL_SPS) {
-        const uint32_t tempSize = size;
+        const uint32_t tempSize = size + 4;
         uint8_t *buf = new uint8_t[tempSize]; // NOLINT(modernize-use-auto)
-        memcpy(buf, data, tempSize);
+        memcpy(buf, startCode, 4);
+        memcpy(buf + 4, data, size);
+
+//
+//        delete[] spsData;
+//
+//       // spsData = new uint8_t[size];
+//        spsData = buf;
+//        spsSize = tempSize;
+
+
 
         /*去除防竞争字节*/
         NALHeader::ebsp_to_rbsp(data, size);
@@ -575,9 +620,10 @@ int NALReader::putNalUintData(NALPicture *&picture, uint8_t *data, uint32_t size
         picture->data.push_back({tempSize, buf, 1});
 
     } else if (nalUnitHeader.nal_unit_type == H264_NAL_PPS) {
-        const uint32_t tempSize = size;
+        const uint32_t tempSize = size + 4;
         uint8_t *buf = new uint8_t[tempSize]; // NOLINT(modernize-use-auto)
-        memcpy(buf, data, tempSize);
+        memcpy(buf, startCode, 4);
+        memcpy(buf + 4, data, size);
 
 
         NALHeader::ebsp_to_rbsp(data, size);
@@ -608,9 +654,10 @@ int NALReader::putNalUintData(NALPicture *&picture, uint8_t *data, uint32_t size
         picture->size += tempSize;
         picture->data.push_back({tempSize, buf, 2});
     } else if (nalUnitHeader.nal_unit_type == H264_NAL_SLICE || nalUnitHeader.nal_unit_type == H264_NAL_IDR_SLICE) {
-        const uint32_t tempSize = size;
+        const uint32_t tempSize = size + 4;
         uint8_t *buf = new uint8_t[tempSize]; // NOLINT(modernize-use-auto)
-        memcpy(buf, data, tempSize);
+        memcpy(buf, startCode, 4);
+        memcpy(buf + 4, data, size);
 
 
         NALHeader::ebsp_to_rbsp(data, size);
@@ -618,9 +665,13 @@ int NALReader::putNalUintData(NALPicture *&picture, uint8_t *data, uint32_t size
 
 //        NALSliceHeader sliceHeader;
         sliceHeader.slice_header(rs, nalUnitHeader, spsList, ppsList);
+        /*第一帧开始，并且是IDR*/
+        if (sliceHeader.first_mb_in_slice == 0 && nalUnitHeader.nal_unit_type == H264_NAL_IDR_SLICE) {
 
+        }
         /*先处理上一帧，如果tag有数据并且first_mb_in_slice=0表示有上一针*/
         if (sliceHeader.first_mb_in_slice == 0 && picture->useFlag) {
+
             /*计算pts和dts*/
             computedTimestamp(picture);
             /*
@@ -676,6 +727,7 @@ int NALReader::putNalUintData(NALPicture *&picture, uint8_t *data, uint32_t size
     return 0;
 }
 
+
 void NALReader::computedTimestamp(NALPicture *picture) {
     if (picture->pictureOrderCount == 0) {
         videoDecodeIdrFrameNumber = videoDecodeFrameNumber * 2;
@@ -683,8 +735,8 @@ void NALReader::computedTimestamp(NALPicture *picture) {
 
     picture->pts = av_rescale_q((videoDecodeIdrFrameNumber + picture->pictureOrderCount) / 2,
                                 picture->sliceHeader.sps.timeBase,
-                                {1, 90000});
-    picture->dts = av_rescale_q(videoDecodeFrameNumber, picture->sliceHeader.sps.timeBase, {1, 90000});
+                                {1, 1000});
+    picture->dts = av_rescale_q(videoDecodeFrameNumber, picture->sliceHeader.sps.timeBase, {1, 1000});
     picture->pcr = av_rescale_q(videoDecodeFrameNumber, picture->sliceHeader.sps.timeBase, {1, 1000});
 
 

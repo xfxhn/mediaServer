@@ -26,6 +26,10 @@ public:
     NALSliceHeader sliceHeader;
     uint8_t *spsData{nullptr};
     uint8_t *ppsData{nullptr};
+    uint8_t spsSize{0};
+    uint8_t ppsSize{0};
+
+
 
 private:
 
@@ -67,6 +71,9 @@ public:
     int test(NALPicture *&picture, bool &flag);
 
     int putNalUintData(NALPicture *&picture, uint8_t *data, uint32_t size);
+
+
+    int test1(NALPicture *&picture, uint8_t *data, uint32_t size);
 
     NALPicture *allocPicture();
 

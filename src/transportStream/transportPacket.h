@@ -6,8 +6,10 @@
 
 #include <cstdint>
 #include <fstream>
+#include <queue>
 #include "SI.h"
 #include "PES.h"
+#include "writeStream.h"
 
 class WriteStream;
 
@@ -17,10 +19,14 @@ class AdtsHeader;
 
 class TransportPacket {
 private:
-
+    std::queue<std::string> list;
+    int packetNumber{0};
+    std::string dir;
+    std::ofstream fs;
+    uint8_t *buffer{nullptr};
+    WriteStream *ws{nullptr};
 
     PES pes;
-
     SI info;
     /*同步字段，固定是0x47*/
     uint8_t sync_byte{0x47};
@@ -74,28 +80,35 @@ private:
 
     uint64_t time{0};
 public:
+    int init(const char *path);
 
-    int writeServiceDescriptionTable(WriteStream &ws);
+    int writeVideo(const NALPicture *picture);
 
-    int writeProgramAssociationTable(WriteStream &ws);
+    int writeTable();
 
-    int writeProgramMapTable(WriteStream &ws);
+    int writeServiceDescriptionTable();
+
+    int writeProgramAssociationTable();
+
+    int writeProgramMapTable();
 
 
-    int writeVideoFrame(const NALPicture *picture, WriteStream &ws, std::ofstream &fs);
+    int writeVideoFrame(const NALPicture *picture);
 
-    int writeAudioFrame(const AdtsHeader &header, WriteStream &ws, std::ofstream &fs);
+    int writeAudioFrame(const AdtsHeader &header);
+
+    ~TransportPacket();
 
 private:
 
 
-    int transport_packet(WriteStream &rs) const;
+    int transport_packet() const;
 
     int setTransportPacketConfig(uint8_t payloadUnitStartIndicator, uint16_t pid, uint8_t control, uint32_t counter);
 
     int setAdaptationFieldConfig(uint8_t randomAccessIndicator, uint16_t adaptationFieldLength, bool flag);
 
-    int adaptation_field(WriteStream &ws) const;
+    int adaptation_field() const;
 };
 
 

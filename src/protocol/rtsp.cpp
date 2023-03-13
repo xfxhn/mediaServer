@@ -376,14 +376,16 @@ indexdeltalength=3：表示音频的访问单元索引差值（AU-Index-delta）
 }
 
 
-static uint8_t startCode[4] = {0, 0, 0, 1};
-
 int Rtsp::receiveData(std::string &packet) {
 
 
     int ret;
+    /*接收rtsp数据，存为ts*/
+    ts.init("test/");
+
     /*一个rtp包最大大小不会超过16个bit也就是65535*/
     uint8_t *buffer = new uint8_t[65535]; // NOLINT(modernize-use-auto)
+    // todo delete buffer
     /*packet这里面有可能还有剩余的字节没读取完*/
     memcpy(buffer, packet.c_str(), packet.length());
     uint32_t bufferSize = packet.length();
@@ -425,7 +427,11 @@ int Rtsp::receiveData(std::string &packet) {
                 rtpBufferSize += size;
             } else {
                 /*处理数据*/
-                disposeRtpData(rtpBuffer, rtpBufferSize, channel, length);
+                ret = disposeRtpData(rtpBuffer, rtpBufferSize, channel, length);
+                if (ret < 0) {
+                    fprintf(stderr, "处理rtp包失败\n");
+                    return ret;
+                }
                 rtpBufferSize -= length;
                 /*这里不用使用memmove,不会发生内存重叠*/
                 memcpy(buffer, rtpBuffer + length, rtpBufferSize);
@@ -494,8 +500,15 @@ int Rtsp::disposeRtpData(uint8_t *rtpBuffer, uint32_t rtpBufferSize, uint8_t cha
                     fprintf(stderr, "nalReader.getPicture 失败\n");
                     return -1;
                 }
-
-                // nalUintOffset = 0;
+                if (nalReader.pictureFinishFlag) {
+                    printf("video duration = %f,idr = %d\n", frame->duration, frame->sliceHeader.nalu.IdrPicFlag);
+                    /*获取到完整的一帧,做对应操作*/
+                    ret = ts.writeVideo(frame);
+                    if (ret < 0) {
+                        fprintf(stderr, "ts.writeVideo 失败\n");
+                        return -1;
+                    }
+                }
             } else {
                 fprintf(stderr, "start = %d 和 end = %d 有问题\n", start, end);
                 return -1;
@@ -523,8 +536,13 @@ int Rtsp::disposeRtpData(uint8_t *rtpBuffer, uint32_t rtpBufferSize, uint8_t cha
                 return -1;
             }
             if (nalReader.pictureFinishFlag) {
-                printf("video duration = %f\n", frame->duration);
+                printf("video duration = %f,idr = %d\n", frame->duration, frame->sliceHeader.nalu.IdrPicFlag);
                 /*获取到完整的一帧,做对应操作*/
+                ret = ts.writeVideo(frame);
+                if (ret < 0) {
+                    fprintf(stderr, "ts.writeVideo 失败\n");
+                    return -1;
+                }
             }
 //            ret = muxTransportStream(channel, rs.currentPtr - 1, length + 1);
 //            if (ret < 0) {
@@ -578,7 +596,7 @@ int Rtsp::disposeRtpData(uint8_t *rtpBuffer, uint32_t rtpBufferSize, uint8_t cha
             memcpy(rs.currentPtr - 7, AdtsHeader::header, 7);
 
             adtsReader.putAACData(adtsHeader, rs.currentPtr - 7, aacSize + 7);
-            printf("audio duration = %f\n", adtsHeader.duration);
+            // printf("audio duration = %f\n", adtsHeader.duration);
 
             //   muxTransportStream(channel, header.data, header.size);
             rs.setBytePtr(aacSize);
@@ -743,6 +761,7 @@ int Rtsp::parseSdp(const std::string &sdp) {
     return 0;
 }
 
+
 int Rtsp::parseMediaLevel(int i, const std::vector<std::string> &list) {
     int ret;
     int num = -1;
@@ -776,28 +795,31 @@ int Rtsp::parseMediaLevel(int i, const std::vector<std::string> &list) {
                             std::map<std::string, std::string> obj = getRtspObj(split(right, ";"), "=");
                             std::vector<std::string> sps_pps = split(obj["sprop-parameter-sets"], ",");
 
+//                            uint8_t sps[50];
                             ret = base64_decode(sps_pps[0], sps);
                             if (ret < 0) {
                                 fprintf(stderr, "解析sps失败\n");
                                 return ret;
                             }
                             spsSize = ret;
-                            ret = nalReader.putNalUintData(frame, sps, spsSize);
+                            /*ret = nalReader.putNalUintData(frame, sps, ret);
                             if (ret < 0) {
                                 fprintf(stderr, "nalReader.getPicture 失败\n");
                                 return -1;
-                            }
+                            }*/
+
+                            // uint8_t pps[50];
                             ret = base64_decode(sps_pps[1], pps);
                             if (ret < 0) {
                                 fprintf(stderr, "解析pps失败\n");
                                 return ret;
                             }
                             ppsSize = ret;
-                            ret = nalReader.putNalUintData(frame, pps, ppsSize);
+                            /*ret = nalReader.putNalUintData(frame, pps, ret);
                             if (ret < 0) {
                                 fprintf(stderr, "nalReader.getPicture 失败\n");
                                 return -1;
-                            }
+                            }*/
                         } else {
                             fprintf(stderr, "解析错误\n");
                             return -1;

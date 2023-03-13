@@ -9,7 +9,7 @@ target_include_directories(protocol
         PRIVATE ${PROJECT_SOURCE_DIR}/src/utils
         PRIVATE ${PROJECT_SOURCE_DIR}/src/socket
         PRIVATE ${PROJECT_SOURCE_DIR}/src/bitStream
-        PRIVATE ${PROJECT_SOURCE_DIR}/src/transportStream
+        PUBLIC ${PROJECT_SOURCE_DIR}/src/transportStream
         )
 
 target_link_libraries(protocol
@@ -17,4 +17,5 @@ target_link_libraries(protocol
         PRIVATE adts
         PRIVATE utils
         PRIVATE bitStream
+        PUBLIC transportStream
         )

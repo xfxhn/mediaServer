@@ -95,17 +95,17 @@ public:
 public:
     SI();
 
-    int program_association_section(WriteStream &ws) const;
+    int program_association_section(WriteStream *ws) const;
 
-    int program_map_section(WriteStream &ws) const;
+    int program_map_section(WriteStream *ws) const;
 
-    int service_description_section(WriteStream &ws);
+    int service_description_section(WriteStream *ws);
 
 
 private:
 
 
-    int service_descriptor(WriteStream &ws) const;
+    int service_descriptor(WriteStream *ws) const;
 
     static uint32_t table[256];
 

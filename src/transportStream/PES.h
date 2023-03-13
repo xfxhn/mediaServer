@@ -40,7 +40,7 @@ private:
     uint64_t pts{0};
     uint64_t dts{0};
 public:
-    int PES_packet(WriteStream &ws) const;
+    int PES_packet(WriteStream *ws) const;
 
     int set_PTS_DTS_flags(uint8_t flags, uint64_t pts, uint64_t dts);
 };

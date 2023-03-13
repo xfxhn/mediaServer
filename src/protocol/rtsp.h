@@ -15,7 +15,7 @@
 #include "NALReader.h"
 #include "adtsHeader.h"
 #include "NALPicture.h"
-//#include <fstream>
+#include "transportPacket.h"
 
 class ReadStream;
 
@@ -23,17 +23,13 @@ class Rtsp {
 private:
 //    std::ofstream fs;
 //    NALDecodedPictureBuffer gop;
+    TransportPacket ts;
 
     NALPicture *frame{nullptr};
     NALReader nalReader;
     AdtsReader adtsReader;
     AdtsHeader adtsHeader;
-    /*NALHeader nalUnitHeader;
 
-    NALSeqParameterSet sps;
-    NALPictureParameterSet pps;
-    NALSeqParameterSet spsList[32];
-    NALPictureParameterSet ppsList[256];*/
 private:
 
     /* byte 0 */
