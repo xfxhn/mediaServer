@@ -1,0 +1,1 @@
+add_library(bitStream writeStream.cpp readStream.cpp)

@@ -1,0 +1,20 @@
+﻿
+
+
+add_library(protocol rtsp.cpp rtpPacket.cpp)
+
+target_include_directories(protocol
+        PUBLIC ${PROJECT_SOURCE_DIR}/src/nalu
+        PUBLIC ${PROJECT_SOURCE_DIR}/src/adts
+        PRIVATE ${PROJECT_SOURCE_DIR}/src/utils
+        PRIVATE ${PROJECT_SOURCE_DIR}/src/socket
+        PRIVATE ${PROJECT_SOURCE_DIR}/src/bitStream
+        PRIVATE ${PROJECT_SOURCE_DIR}/src/transportStream
+        )
+
+target_link_libraries(protocol
+        PRIVATE nalu
+        PRIVATE adts
+        PRIVATE utils
+        PRIVATE bitStream
+        )
