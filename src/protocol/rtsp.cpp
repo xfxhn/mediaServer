@@ -29,6 +29,9 @@ enum {
 int Rtsp::init(SOCKET socket) {
     clientSocket = socket;
     nalUintData = new uint8_t[NALReader::MAX_BUFFER_SIZE];
+
+    // nalReader.init1();
+
 //    aacFrameData = new uint8_t[AdtsReader::MAX_BUFFER_SIZE];
 //    aacHeader = aacFrameData;
 //    aacData = &aacFrameData[7];
@@ -445,6 +448,7 @@ int Rtsp::receiveData(std::string &packet) {
     return 0;
 }
 
+static constexpr uint8_t startCode[4] = {0, 0, 0, 1};
 
 int Rtsp::disposeRtpData(uint8_t *rtpBuffer, uint32_t rtpBufferSize, uint8_t channel, uint16_t length) {
     int ret;
@@ -486,8 +490,10 @@ int Rtsp::disposeRtpData(uint8_t *rtpBuffer, uint32_t rtpBufferSize, uint8_t cha
 
             if (start == 1 && end == 0) {
                 *(rs.currentPtr - 1) = forbidden_zero_bit << 7 | (nal_ref_idc << 5) | nal_unit_type;
-                memcpy(nalUintData, rs.currentPtr - 1, length + 1);
-                nalUintOffset = length + 1;
+                /*这里手动给nalu加上起始码，固定0001*/
+                memcpy(nalUintData, startCode, 4);
+                memcpy(nalUintData + 4, rs.currentPtr - 1, length + 1);
+                nalUintOffset = 4 + length + 1;
             } else if (start == 0 && end == 0) {
                 memcpy(nalUintData + nalUintOffset, rs.currentPtr, length);
                 nalUintOffset += length;
@@ -495,7 +501,7 @@ int Rtsp::disposeRtpData(uint8_t *rtpBuffer, uint32_t rtpBufferSize, uint8_t cha
                 memcpy(nalUintData + nalUintOffset, rs.currentPtr, length);
                 nalUintOffset += length;
 
-                ret = nalReader.putNalUintData(frame, nalUintData, nalUintOffset);
+                ret = nalReader.test1(frame, nalUintData, nalUintOffset);
                 if (ret < 0) {
                     fprintf(stderr, "nalReader.getPicture 失败\n");
                     return -1;
@@ -513,24 +519,17 @@ int Rtsp::disposeRtpData(uint8_t *rtpBuffer, uint32_t rtpBufferSize, uint8_t cha
                 fprintf(stderr, "start = %d 和 end = %d 有问题\n", start, end);
                 return -1;
             }
-//            if (start) {
-//                /*添加分隔符，一个nalu的起始*/
-//                fs.write(reinterpret_cast<const char *>(startCode), 4);
-//                *(rs.currentPtr - 1) = forbidden_zero_bit << 7 | (nal_ref_idc << 5) | nal_unit_type;
-//                fs.write(reinterpret_cast<const char *>(rs.currentPtr - 1), length + 1);
-//
-//            } else {
-//                fs.write(reinterpret_cast<const char *>(rs.currentPtr), length);
-//            }
-
-
         } else if (nal_unit_type == FU_B) {
             printf("FU_B\n");
             return -1;
         } else {
+            /*这里手动给nalu加上起始码，固定0001*/
+            memcpy(rs.currentPtr - 5, startCode, 4);
+
             *(rs.currentPtr - 1) = forbidden_zero_bit << 7 | (nal_ref_idc << 5) | nal_unit_type;
 
-            ret = nalReader.putNalUintData(frame, rs.currentPtr - 1, length + 1);
+
+            ret = nalReader.test1(frame, rs.currentPtr - 5, length + 5);
             if (ret < 0) {
                 fprintf(stderr, "nalReader.getPicture 失败\n");
                 return -1;
@@ -612,7 +611,7 @@ int Rtsp::disposeRtpData(uint8_t *rtpBuffer, uint32_t rtpBufferSize, uint8_t cha
 }
 
 
-int Rtsp::muxTransportStream(uint8_t channel, uint8_t *data, uint32_t size) {
+/*int Rtsp::muxTransportStream(uint8_t channel, uint8_t *data, uint32_t size) {
     int ret;
     ret = nalReader.putNalUintData(frame, data, size);
     if (ret < 0) {
@@ -620,11 +619,11 @@ int Rtsp::muxTransportStream(uint8_t channel, uint8_t *data, uint32_t size) {
         return -1;
     }
     if (nalReader.pictureFinishFlag) {
-        /*获取到完整的一帧,做对应操作*/
+        *//*获取到完整的一帧,做对应操作*//*
     }
 
     return 0;
-}
+}*/
 
 /*发送音频和视频的函数*/
 int Rtsp::sendVideo() {
@@ -795,31 +794,33 @@ int Rtsp::parseMediaLevel(int i, const std::vector<std::string> &list) {
                             std::map<std::string, std::string> obj = getRtspObj(split(right, ";"), "=");
                             std::vector<std::string> sps_pps = split(obj["sprop-parameter-sets"], ",");
 
-//                            uint8_t sps[50];
-                            ret = base64_decode(sps_pps[0], sps);
+                            uint8_t sps[50];
+                            memcpy(sps, startCode, 4);
+                            ret = base64_decode(sps_pps[0], sps + 4);
                             if (ret < 0) {
                                 fprintf(stderr, "解析sps失败\n");
                                 return ret;
                             }
-                            spsSize = ret;
-                            /*ret = nalReader.putNalUintData(frame, sps, ret);
+//                            spsSize = ret;
+                            ret = nalReader.test1(frame, sps, ret + 4);
                             if (ret < 0) {
                                 fprintf(stderr, "nalReader.getPicture 失败\n");
                                 return -1;
-                            }*/
+                            }
 
-                            // uint8_t pps[50];
-                            ret = base64_decode(sps_pps[1], pps);
+                            uint8_t pps[50];
+                            memcpy(pps, startCode, 4);
+                            ret = base64_decode(sps_pps[1], pps + 4);
                             if (ret < 0) {
                                 fprintf(stderr, "解析pps失败\n");
                                 return ret;
                             }
-                            ppsSize = ret;
-                            /*ret = nalReader.putNalUintData(frame, pps, ret);
+//                            ppsSize = ret;
+                            ret = nalReader.test1(frame, pps, ret + 4);
                             if (ret < 0) {
                                 fprintf(stderr, "nalReader.getPicture 失败\n");
                                 return -1;
-                            }*/
+                            }
                         } else {
                             fprintf(stderr, "解析错误\n");
                             return -1;
@@ -866,17 +867,6 @@ std::map<std::string, std::string> Rtsp::getRtspObj(const std::vector<std::strin
     return obj;
 }
 
-Rtsp::~Rtsp() {
-    if (videoThread && videoThread->joinable()) {
-        videoThread->join();
-        delete videoThread;
-    }
-
-    if (audioThread && audioThread->joinable()) {
-        audioThread->join();
-        delete audioThread;
-    }
-}
 
 int Rtsp::parseAACConfig(const std::string &config) {
     // 把十六进制字符串转换成二进制字符串
@@ -952,7 +942,17 @@ int Rtsp::parseAACConfig(const std::string &config) {
 }
 
 
+Rtsp::~Rtsp() {
+    if (videoThread && videoThread->joinable()) {
+        videoThread->join();
+        delete videoThread;
+    }
 
+    if (audioThread && audioThread->joinable()) {
+        audioThread->join();
+        delete audioThread;
+    }
+}
 
 
 

@@ -2,8 +2,15 @@
 
 #include "NALPicture.h"
 
-
 #include <cstdio>
+
+
+/*
+ * 解码POC需要用到上一个参考帧，和上一个顺序解码的帧，那就肯定要缓存帧，以做解码，
+ * 所以需要标记参考帧，放进参考帧列表里面，并且也要有参考帧标记过程，把一些不用于参考的给剔除，
+ * 你也得要有参考标记过程，标记哪个是参考帧，所以之前那个是必须的，
+ * 所以解码POC需要有参考帧标记流程，因为用到了上一个参考帧
+ * */
 
 int NALPicture::decoding_process_for_picture_order_count() {
     int ret = 0;
@@ -184,6 +191,8 @@ int NALPicture::decoding_process_for_picture_order_count_type_2() {
 }
 
 void NALPicture::reset() {
+
+    useFlag = false;
     size = 0;
     dts = 0;
     pts = 0;
@@ -203,18 +212,20 @@ void NALPicture::reset() {
     memory_management_control_operation_5_flag = false;
     memory_management_control_operation_6_flag = false;
 
-    useFlag = false;
-    while (!data.empty()) {
+
+    FrameNumOffset = 0;
+    PicOrderCntMsb = 0;
+    /*while (!data.empty()) {
         uint8_t *buf = data.back().data;
         delete[] buf;
         data.pop_back();
-    }
+    }*/
 }
 
 NALPicture::~NALPicture() {
-    while (!data.empty()) {
+    /*while (!data.empty()) {
         uint8_t *buf = data.back().data;
         delete[] buf;
         data.pop_back();
-    }
+    }*/
 }

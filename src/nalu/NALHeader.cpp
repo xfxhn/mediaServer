@@ -31,7 +31,7 @@ void NALHeader::nal_unit(uint8_t header) {
     }*/
 }
 
-/*body*/
+
 void NALHeader::ebsp_to_rbsp(uint8_t *data, uint32_t &size) {
     uint32_t NumBytesInRBSP = 0;
     for (uint32_t i = 1; i < size; i++) {

@@ -24,12 +24,10 @@ public:
     NALSeqParameterSet sps;
     NALPictureParameterSet pps;
     NALSliceHeader sliceHeader;
-    uint8_t *spsData{nullptr};
-    uint8_t *ppsData{nullptr};
+    uint8_t spsData[50];
+    uint8_t ppsData[50];
     uint8_t spsSize{0};
     uint8_t ppsSize{0};
-
-
 
 private:
 
@@ -39,11 +37,12 @@ private:
     uint8_t *bufferEnd{nullptr};
     uint32_t blockBufferSize{0};
 
+    NALPicture *unoccupiedPicture{nullptr};
 private:
 
     bool finishFlag{false};
     NALHeader nalUnitHeader;
-    NALPicture *unoccupiedPicture{nullptr};
+
     NALDecodedPictureBuffer gop;
 
     uint64_t videoDecodeFrameNumber{0};
@@ -60,9 +59,10 @@ private:
     void computedTimestamp(NALPicture *picture);
 
 public:
-    int init(const char *filename);
 
-    int getSpsAndPps(uint32_t &spsSize, uint32_t &ppsSize);
+    int init1();
+
+    int init(const char *filename);
 
     int readNalUint(uint8_t *&data, uint32_t &size, int &startCodeLength, bool &isStopLoop);
 

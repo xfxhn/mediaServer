@@ -77,10 +77,10 @@ private:
     uint8_t videoChannel{0};
     uint8_t audioChannel{0};
 
-    uint8_t sps[100];
+   /* uint8_t sps[100];
     int spsSize{0};
     uint8_t pps[100];
-    int ppsSize{0};
+    int ppsSize{0};*/
 
 //    uint8_t audioObjectType;
 //    uint8_t samplingFrequencyIndex;
@@ -133,7 +133,7 @@ private:
     static std::map<std::string, std::string>
     getRtspObj(const std::vector<std::string> &list, const std::string &spacer);
 
-    int muxTransportStream(uint8_t channel, uint8_t *data, uint32_t size);
+    /*int muxTransportStream(uint8_t channel, uint8_t *data, uint32_t size);*/
 
     int parseAACConfig(const std::string &config);
 };
