@@ -140,7 +140,7 @@ int AdtsReader::getAudioFrame(AdtsHeader &header, bool &flag) {
         return ret;
     }
     header.duration += (1024.0 / header.sample_rate);
-    header.dts = av_rescale_q(audioDecodeFrameNumber, {1, static_cast<int>(header.sample_rate)}, {1, 90000});
+    header.dts = av_rescale_q(audioDecodeFrameNumber, {1, static_cast<int>(header.sample_rate)}, {1, 1000});
     header.pts = header.dts;
     audioDecodeFrameNumber += 1024;
     return 0;
@@ -158,7 +158,7 @@ int AdtsReader::putAACData(AdtsHeader &header, uint8_t *data, uint32_t size) {
     header.data = data;
     header.size = size;
     header.duration += (1024.0 / header.sample_rate);
-    header.dts = av_rescale_q(audioDecodeFrameNumber, {1, static_cast<int>(header.sample_rate)}, {1, 90000});
+    header.dts = av_rescale_q(audioDecodeFrameNumber, {1, static_cast<int>(header.sample_rate)}, {1, 1000});
     header.pts = header.dts;
     audioDecodeFrameNumber += 1024;
     return 0;

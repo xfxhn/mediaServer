@@ -425,8 +425,7 @@ int NALReader::test1(NALPicture *&picture, uint8_t *data, uint32_t size) {
         NALHeader::ebsp_to_rbsp(header, headerSize);
         ReadStream rs(header, headerSize);
 
-//        NALSliceHeader sliceHeader;
-        // sliceHeader.slice_header(rs, nalUnitHeader, spsList, ppsList);
+
         picture->sliceHeader.slice_header(rs, nalUnitHeader, spsList, ppsList);
         if (picture->sliceHeader.first_mb_in_slice != 0) {
             fprintf(stderr, "不支持一帧分成多个slice\n");
@@ -458,9 +457,11 @@ int NALReader::test1(NALPicture *&picture, uint8_t *data, uint32_t size) {
         /*计算pts和dts*/
         computedTimestamp(picture);
 
-
-        picture->size = size;
+        picture->size += size;
         picture->data.push_back({size, data, 0});
+
+        //fs1.write(reinterpret_cast<const char *>(picture->data[0].data), picture->data[0].nalUintSize);
+
         pictureFinishFlag = true;
     } else if (nalUnitHeader.nal_unit_type == H264_NAL_IDR_SLICE) {
 
@@ -470,8 +471,7 @@ int NALReader::test1(NALPicture *&picture, uint8_t *data, uint32_t size) {
         memcpy(header, data + 4, headerSize);
         NALHeader::ebsp_to_rbsp(header, headerSize);
         ReadStream rs(header, headerSize);
-        /*   NALHeader::ebsp_to_rbsp(data, size);
-           ReadStream rs(data, size);*/
+
 
         picture->sliceHeader.slice_header(rs, nalUnitHeader, spsList, ppsList);
         if (picture->sliceHeader.first_mb_in_slice != 0) {
@@ -508,22 +508,22 @@ int NALReader::test1(NALPicture *&picture, uint8_t *data, uint32_t size) {
 
 
 
-        //        uint8_t *buf = new uint8_t[spsSize]; // NOLINT(modernize-use-auto)
-//        memcpy(buf, spsData, spsSize);
+
         picture->size += spsSize;
         picture->data.push_back({spsSize, spsData, 1});
+        //fs1.write(reinterpret_cast<const char *>(spsData), spsSize);
 
-//        buf = new uint8_t[ppsSize]; // NOLINT(modernize-use-auto)
-//        memcpy(buf, ppsData, ppsSize);
+
         picture->size += ppsSize;
         picture->data.push_back({ppsSize, ppsData, 2});
-
+        //fs1.write(reinterpret_cast<const char *>(ppsData), ppsSize);
 
         picture->size += size;
         picture->data.push_back({size, data, 3});
+        //fs1.write(reinterpret_cast<const char *>(picture->data[2].data), picture->data[2].nalUintSize);
         pictureFinishFlag = true;
     } else {
-        fprintf(stderr, "其他type");
+        fprintf(stderr, "其他type\n");
         pictureFinishFlag = false;
     }
     return 0;
@@ -728,14 +728,7 @@ NALReader::~NALReader() {
 
 }
 
-int NALReader::init1() {
-    unoccupiedPicture = allocPicture();
-    if (!unoccupiedPicture) {
-        return -1;
-    }
 
-    return 0;
-}
 
 
 

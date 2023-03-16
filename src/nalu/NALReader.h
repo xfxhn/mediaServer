@@ -4,6 +4,7 @@
 
 #include <cstdint>
 #include <fstream>
+#include <cstring>
 #include "NALHeader.h"
 #include "NALPicture.h"
 #include "NALDecodedPictureBuffer.h"
@@ -60,7 +61,6 @@ private:
 
 public:
 
-    int init1();
 
     int init(const char *filename);
 

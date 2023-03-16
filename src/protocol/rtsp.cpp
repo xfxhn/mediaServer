@@ -41,7 +41,11 @@ int Rtsp::init(SOCKET socket) {
         fprintf(stderr, "获取frame失败\n");
         return -1;
     }
-
+    /*fs.open("resource/bbbbbb.aac", std::ios::binary | std::ios::out | std::ios::trunc);
+    if (!fs.is_open()) {
+        fprintf(stderr, "cloud not open %s\n", "resource/bbbbbb.aac");
+        return -1;
+    }*/
     return 0;
 }
 
@@ -509,6 +513,7 @@ int Rtsp::disposeRtpData(uint8_t *rtpBuffer, uint32_t rtpBufferSize, uint8_t cha
                 if (nalReader.pictureFinishFlag) {
                     printf("video duration = %f,idr = %d\n", frame->duration, frame->sliceHeader.nalu.IdrPicFlag);
                     /*获取到完整的一帧,做对应操作*/
+
                     ret = ts.writeVideo(frame);
                     if (ret < 0) {
                         fprintf(stderr, "ts.writeVideo 失败\n");
@@ -523,36 +528,25 @@ int Rtsp::disposeRtpData(uint8_t *rtpBuffer, uint32_t rtpBufferSize, uint8_t cha
             printf("FU_B\n");
             return -1;
         } else {
-            /*这里手动给nalu加上起始码，固定0001*/
-            memcpy(rs.currentPtr - 5, startCode, 4);
 
-            *(rs.currentPtr - 1) = forbidden_zero_bit << 7 | (nal_ref_idc << 5) | nal_unit_type;
-
-
-            ret = nalReader.test1(frame, rs.currentPtr - 5, length + 5);
+            uint8_t *ptr = rs.currentPtr - 5;
+            memcpy(ptr, startCode, 4);
+            *(ptr + 4) = forbidden_zero_bit << 7 | (nal_ref_idc << 5) | nal_unit_type;
+            ret = nalReader.test1(frame, ptr, length + 5);
             if (ret < 0) {
                 fprintf(stderr, "nalReader.getPicture 失败\n");
                 return -1;
             }
+
+
             if (nalReader.pictureFinishFlag) {
-                printf("video duration = %f,idr = %d\n", frame->duration, frame->sliceHeader.nalu.IdrPicFlag);
-                /*获取到完整的一帧,做对应操作*/
+                //printf("video duration = %f,idr = %d\n", frame->duration, frame->sliceHeader.nalu.IdrPicFlag);
                 ret = ts.writeVideo(frame);
                 if (ret < 0) {
                     fprintf(stderr, "ts.writeVideo 失败\n");
                     return -1;
                 }
             }
-//            ret = muxTransportStream(channel, rs.currentPtr - 1, length + 1);
-//            if (ret < 0) {
-//                fprintf(stderr, "muxTransportStream 失败\n");
-//                return -1;
-//            }
-//            printf("nal_unit_type = %d\n", nal_unit_type);
-            /*这里都认为是一个rtp包一个nalu*/
-//            fs.write(reinterpret_cast<const char *>(startCode), 4);
-//            *(rs.currentPtr - 1) = forbidden_zero_bit << 7 | (nal_ref_idc << 5) | nal_unit_type;
-//            fs.write(reinterpret_cast<const char *>(rs.currentPtr - 1), length + 1);
 
         }
     } else if (channel == audioChannel) {
@@ -575,31 +569,21 @@ int Rtsp::disposeRtpData(uint8_t *rtpBuffer, uint32_t rtpBufferSize, uint8_t cha
             uint16_t sizeLength = rs.readMultiBit(13);
             uint8_t indexDelta = rs.readMultiBit(3);
             sizeList.push_back(sizeLength);
-
-
-//            WriteStream ws(adtsHeader, 7);
-//            header.setConfig(audioObjectType - 1, samplingFrequencyIndex, channelConfiguration, sizeLength + 7);
-//            header.writeAdtsHeader(ws);
-//
-//
-//            fs.write(reinterpret_cast<const char *>(adtsHeader), 7);
-//            offset = (headerLength * 2) + size;
-//            fs.write(reinterpret_cast<const char *>(ptr + offset), sizeLength);
-//
-//            size += sizeLength;
-            /*rs.setBytePtr(sizeLength);
-            i*/
         }
         for (uint16_t aacSize: sizeList) {
             AdtsHeader::setFrameLength(aacSize + 7);
             memcpy(rs.currentPtr - 7, AdtsHeader::header, 7);
 
             adtsReader.putAACData(adtsHeader, rs.currentPtr - 7, aacSize + 7);
-            // printf("audio duration = %f\n", adtsHeader.duration);
 
-            //   muxTransportStream(channel, header.data, header.size);
+
+
+            ret = ts.writeAudioFrame(adtsHeader);
+            if (ret < 0) {
+                fprintf(stderr, "写入音频失败\n");
+                return -1;
+            }
             rs.setBytePtr(aacSize);
-
         }
 
 
@@ -609,21 +593,6 @@ int Rtsp::disposeRtpData(uint8_t *rtpBuffer, uint32_t rtpBufferSize, uint8_t cha
 
     return 0;
 }
-
-
-/*int Rtsp::muxTransportStream(uint8_t channel, uint8_t *data, uint32_t size) {
-    int ret;
-    ret = nalReader.putNalUintData(frame, data, size);
-    if (ret < 0) {
-        fprintf(stderr, "nalReader.getPicture 失败\n");
-        return -1;
-    }
-    if (nalReader.pictureFinishFlag) {
-        *//*获取到完整的一帧,做对应操作*//*
-    }
-
-    return 0;
-}*/
 
 /*发送音频和视频的函数*/
 int Rtsp::sendVideo() {

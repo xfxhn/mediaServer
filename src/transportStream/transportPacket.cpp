@@ -48,17 +48,13 @@ int TransportPacket::writeVideo(const NALPicture *picture) {
         }
         writeTable();
         if (list.size() > 3) {
-
             std::string &oldName = list.front();
-
             ret = std::remove((dir + oldName).c_str());
             if (ret != 0) {
                 fprintf(stderr, "删除%s失败\n", oldName.c_str());
                 return ret;
             }
-
             list.pop();
-
         }
 
     }
@@ -318,8 +314,8 @@ int TransportPacket::writeAudioFrame(const AdtsHeader &header) {
     ws->reset();
 
     /*总共还有多少字节*/
-    uint32_t totalByteSize = header.size + 7;
-    uint8_t *data = header.data - 7;
+    uint32_t totalByteSize = header.size;
+    uint8_t *data = header.data;
     /*还有多少空闲字节*/
     uint32_t unoccupiedByte = 0;
     uint32_t offset = 0;

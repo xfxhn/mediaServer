@@ -220,6 +220,7 @@ void NALPicture::reset() {
         delete[] buf;
         data.pop_back();
     }*/
+    data.clear();
 }
 
 NALPicture::~NALPicture() {
