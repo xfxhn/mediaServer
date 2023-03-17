@@ -1,1 +1,1 @@
-﻿add_library(utils util.cpp)
+﻿add_library(utils util.cpp parseUrl.cpp)

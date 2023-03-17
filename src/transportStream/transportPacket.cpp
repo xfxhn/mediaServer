@@ -2,6 +2,8 @@
 
 #include "transportPacket.h"
 #include <cstdio>
+#include <string>
+#include <cstring>
 #include "NALPicture.h"
 #include "adtsHeader.h"
 
@@ -31,6 +33,13 @@ int TransportPacket::init(const char *path) {
     dir = path;
     buffer = new uint8_t[TRANSPORT_STREAM_PACKETS_SIZE];
     ws = new WriteStream(buffer, TRANSPORT_STREAM_PACKETS_SIZE);
+
+
+    indexFs.open(dir + "test.m3u8", std::ios::binary | std::ios::out | std::ios::trunc);
+    if (!indexFs.is_open()) {
+        fprintf(stderr, "cloud not open %s\n", (dir + "test.m3u8").c_str());
+        return -1;
+    }
     return 0;
 }
 
@@ -40,23 +49,63 @@ int TransportPacket::writeVideo(const NALPicture *picture) {
         fs.close();
 
         std::string newName = "test" + std::to_string(packetNumber++) + ".ts";
-        list.push(newName);
+        /*当前的时间减去上个切片的时间*/
+        double duration = picture->duration - lastDuration;
+        list.push_back({newName, duration});
         fs.open(dir + newName, std::ios::binary | std::ios::out | std::ios::trunc);
         if (!fs.is_open()) {
             fprintf(stderr, "cloud not open %s\n", (dir + "/test" + std::to_string(packetNumber++) + ".ts").c_str());
             return -1;
         }
         writeTable();
+
         if (list.size() > 3) {
-            std::string &oldName = list.front();
+            char m3u8Buffer[200]{0};
+            TransportStreamInfo info1 = list[list.size() - 1];
+            TransportStreamInfo info2 = list[list.size() - 2];
+            TransportStreamInfo info3 = list[list.size() - 3];
+            double maxDuration = std::max(info3.duration, std::max(info1.duration, info2.duration));
+
+            indexFs.seekp(0, std::ios::beg);
+            indexFs.write("", 0);
+
+
+            sprintf(m3u8Buffer,
+                    "#EXTM3U\r\n"
+                    "#EXT-X-VERSION:3\r\n"
+                    "#EXT-X-TARGETDURATION:%f\r\n"
+                    "#EXT-X-MEDIA-SEQUENCE:%d\r\n"
+                    "#EXTINF:%f,\r\n"
+                    "%s\r\n"
+                    "#EXTINF:%f,\r\n"
+                    "%s\r\n"
+                    "#EXTINF:%f,\r\n"
+                    "%s\r\n",
+                    maxDuration,
+                    seq++,
+                    info3.duration,
+                    info3.name.c_str(),
+                    info2.duration,
+                    info2.name.c_str(),
+                    info1.duration,
+                    info1.name.c_str()
+            );
+            printf("%s", m3u8Buffer);
+            printf("------------\n");
+            indexFs.write(m3u8Buffer, strlen(m3u8Buffer));
+        }
+
+        if (list.size() > 10) {
+            std::string &oldName = list[0].name;
             ret = std::remove((dir + oldName).c_str());
             if (ret != 0) {
                 fprintf(stderr, "删除%s失败\n", oldName.c_str());
                 return ret;
             }
-            list.pop();
+            list.erase(list.begin());
         }
 
+        lastDuration = picture->duration;
     }
     ret = writeVideoFrame(picture);
     if (ret < 0) {
@@ -454,6 +503,8 @@ TransportPacket::setAdaptationFieldConfig(uint8_t randomAccessIndicator, uint16_
 TransportPacket::~TransportPacket() {
     delete[] buffer;
     delete ws;
+    fs.close();
+    indexFs.close();
 }
 
 

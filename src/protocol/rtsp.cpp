@@ -3,6 +3,7 @@
 
 
 #include "util.h"
+#include "parseUrl.h"
 
 
 #include "readStream.h"
@@ -71,13 +72,18 @@ int Rtsp::parseRtsp(std::string &packet, const std::string &data) {
     std::vector<std::string> list = split(data, "\r\n");
     char method[20]{0};
     char url[50]{0};
-    char version[20]{0};
+    char protocolVersion[20]{0};
+
     char responseBuffer[1024]{0};
-    int num = sscanf(list.front().c_str(), "%s %s %s\r\n", method, url, version);
+
+
+    int num = sscanf(list.front().c_str(), "%s %s %s\r\n", method, url, protocolVersion);
     if (num != 3) {
         fprintf(stderr, "解析method, url, version失败\n");
         return -1;
     }
+    ParseUrl urlUtils(url, 554);
+    urlUtils.parse();
 
     list.erase(list.begin());
 
@@ -156,24 +162,49 @@ indexdeltalength=3：表示音频的访问单元索引差值（AU-Index-delta）
                 "a=rtpmap:97 mpeg4-generic/%s/%s\r\n"
                 "a=fmtp:97 SizeLength=13;IndexLength=3;IndexDeltaLength=3;config=%s\r\n"
                 "a=control:audio\r\n",*/
-        /*sprintf(sdp,
+        std::string videoFmtp;
+        std::string videoRtpmap;
+        std::string videoControl;
+        std::string audioFmtp;
+        std::string audioRtpmap;
+        std::string audioControl;
+
+        for (std::map<std::string, std::string> &map: sdpInfo.media) {
+            if (map["type"] == "video" && map.count("fmtp") && map.count("rtpmap")) {
+                videoFmtp = map["fmtp"];
+                videoRtpmap = map["rtpmap"];
+                videoControl = map["control"];
+            } else if (map["type"] == "audio" && map.count("fmtp") && map.count("rtpmap")) {
+                audioFmtp = map["fmtp"];
+                audioRtpmap = map["rtpmap"];
+                audioControl = map["control"];
+            } else {
+                fprintf(stderr, "没找到对应的fmtp和rtpmap\n");
+                return -1;
+            }
+        }
+
+        sprintf(sdp,
                 "v=0\r\n"
-                "o=- 9%llu 1 IN IP4 %s\r\n"
+                "o=- 9%llu 0 IN IP4 %s\r\n"
                 "t=0 0\r\n"
                 "a=control:*\r\n"
                 "m=video 0 RTP/AVP 96\r\n"
-                "a=rtpmap:96 H264/90000\r\n"
-                "a=fmtp:96 packetization-mode=1;sprop-parameter-sets=%s;profile-level-id=%s\r\n"
-                "a=control:video\r\n"
+                "a=rtpmap:96 %s\r\n"
+                "a=fmtp:96 %s\r\n"
+                "a=control:%s\r\n"
                 "m=audio 0 RTP/AVP 97\r\n"
-                "a=rtpmap:97 mpeg4-generic/%s/%s\r\n"
-                "a=fmtp:97 SizeLength=13;IndexLength=3;IndexDeltaLength=3;config=%s\r\n"
-                "a=control:audio\r\n",
-                time(nullptr), clientIp,
-                sprop_parameter_sets.c_str(), profileLevelId.c_str(),
-                std::to_string(header.sample_rate).c_str(), std::to_string(header.channel_configuration).c_str(),
-                aacConfig.c_str()
-        );*/
+                "a=rtpmap:97 %s\r\n"
+                "a=fmtp:97 %s\r\n"
+                "a=control:%s\r\n",
+                time(nullptr), urlUtils.getDomain().c_str(),
+                videoRtpmap.c_str(),
+                videoFmtp.c_str(),
+                videoControl.c_str(),
+                audioRtpmap.c_str(),
+                audioFmtp.c_str(),
+                audioControl.c_str()
+        );
         /*上面这里使用从推流端传过来的信息，在sdpInfo里，然后返回给拉流端*/
         /*%zu 为无符号整型*/
         sprintf(responseBuffer,
@@ -261,15 +292,8 @@ indexdeltalength=3：表示音频的访问单元索引差值（AU-Index-delta）
             return -1;
         }
 
-        std::string rtspUrl = url;
-        size_t third_slash = rtspUrl.find('/', rtspUrl.find('/', rtspUrl.find('/') + 1) + 1);
-
-        if (third_slash == std::string::npos) {
-            fprintf(stderr, "setup , url path = null\n");
-            return -1;
-        }
         // 截取第三个斜杠后面的子串，就是路径部分
-        std::string path = rtspUrl.substr(third_slash);
+        std::string path = urlUtils.getPath();//rtspUrl.substr(third_slash);
 
         uint8_t rtpChannel = 0;
         uint8_t rtcpChannel = 0;
@@ -558,11 +582,7 @@ int Rtsp::disposeRtpData(uint8_t *rtpBuffer, uint32_t rtpBufferSize, uint8_t cha
             return ret;
         }
 
-
         uint16_t headerLength = rs.readMultiBit(16) / 16;
-        int size = 0;
-        int offset = 0;
-        uint8_t *ptr = rs.currentPtr;
 
         std::vector<uint16_t> sizeList;
         for (int i = 0; i < headerLength; ++i) {
@@ -575,7 +595,6 @@ int Rtsp::disposeRtpData(uint8_t *rtpBuffer, uint32_t rtpBufferSize, uint8_t cha
             memcpy(rs.currentPtr - 7, AdtsHeader::header, 7);
 
             adtsReader.putAACData(adtsHeader, rs.currentPtr - 7, aacSize + 7);
-
 
 
             ret = ts.writeAudioFrame(adtsHeader);
@@ -611,6 +630,7 @@ int Rtsp::sendVideo() {
         videoSendError = true;
         return ret;
     }
+
     NALPicture *picture = reader.allocPicture();
     while (flag) {
         ret = reader.getVideoFrame(picture, flag);

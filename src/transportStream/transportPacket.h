@@ -6,7 +6,7 @@
 
 #include <cstdint>
 #include <fstream>
-#include <queue>
+#include <vector>
 #include "SI.h"
 #include "PES.h"
 #include "writeStream.h"
@@ -17,9 +17,18 @@ class NALPicture;
 
 class AdtsHeader;
 
+struct TransportStreamInfo {
+    std::string name;
+    double duration;
+};
+
 class TransportPacket {
 private:
-    std::queue<std::string> list;
+    uint32_t seq{0};
+    double lastDuration{0};
+
+    std::ofstream indexFs;
+    std::vector<TransportStreamInfo> list;
     int packetNumber{0};
     std::string dir;
     std::ofstream fs;

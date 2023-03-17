@@ -507,8 +507,6 @@ int NALReader::test1(NALPicture *&picture, uint8_t *data, uint32_t size) {
         computedTimestamp(picture);
 
 
-
-
         picture->size += spsSize;
         picture->data.push_back({spsSize, spsData, 1});
         //fs1.write(reinterpret_cast<const char *>(spsData), spsSize);
@@ -698,8 +696,8 @@ void NALReader::computedTimestamp(NALPicture *picture) {
     picture->pcr = av_rescale_q(videoDecodeFrameNumber, picture->sliceHeader.sps.timeBase, {1, 1000});
 
 
-    ++videoDecodeFrameNumber;
     picture->duration = (double) videoDecodeFrameNumber / picture->sliceHeader.sps.fps;
+    ++videoDecodeFrameNumber;
 }
 
 NALPicture *NALReader::allocPicture() {
