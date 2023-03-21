@@ -6,7 +6,25 @@
 #include <iostream>
 #include "readStream.h"
 
+
+#include "NALReader.h"
+
 int main() {
+    int ret1;
+    NALReader reader;
+    reader.init1("test/", 14);
+
+    uint8_t *data;
+    uint32_t size;
+    while (true) {
+        ret1 = reader.readNalUint1(data, size);
+        if (ret1 < 0) {
+            return ret1;
+        }
+    }
+
+
+    return 0;
     uint8_t arr[12] = {0x80, 0xe0, 0x42, 0x24, 0x59, 0x1a, 0x7b, 0x45, 0x80};
     ReadStream rs(arr, 12);
 

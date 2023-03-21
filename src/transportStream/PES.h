@@ -7,6 +7,19 @@
 
 class WriteStream;
 
+class ReadStream;
+
+/*enum {
+    program_stream_map = 0xBC,
+    padding_stream = 0xBE,
+    private_stream_2 = 0xBF,
+    ECM_STREAM = 0xF0,
+    EMM_STREAM = 0xF1,
+    program_stream_directory = 0xFF,
+    DSMCC_stream = 0xF2,
+    E_STREAM = 0xF8
+};*/
+
 class PES {
 private:
     uint32_t packet_start_code_prefix{0x000001};
@@ -41,6 +54,8 @@ private:
     uint64_t dts{0};
 public:
     int PES_packet(WriteStream *ws) const;
+
+    static int read_PES_packet(ReadStream &rs) ;
 
     int set_PTS_DTS_flags(uint8_t flags, uint64_t pts, uint64_t dts);
 };

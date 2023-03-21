@@ -10,6 +10,9 @@
 #include "writeStream.h"
 
 
+#include "demuxPacket.h"
+
+#define TRANSPORT_STREAM_PACKETS_SIZE 188
 #define RTP_PAYLOAD_TYPE_H264   96
 #define RTP_PAYLOAD_TYPE_AAC    97
 enum {
@@ -528,7 +531,7 @@ int Rtsp::disposeRtpData(uint8_t *rtpBuffer, uint32_t rtpBufferSize, uint8_t cha
             } else if (start == 0 && end == 1) {
                 memcpy(nalUintData + nalUintOffset, rs.currentPtr, length);
                 nalUintOffset += length;
-
+                /*这里还可以依靠mark标记来确定一帧的最后一个slice*/
                 ret = nalReader.test1(frame, nalUintData, nalUintOffset);
                 if (ret < 0) {
                     fprintf(stderr, "nalReader.getPicture 失败\n");
@@ -538,7 +541,7 @@ int Rtsp::disposeRtpData(uint8_t *rtpBuffer, uint32_t rtpBufferSize, uint8_t cha
                     printf("video duration = %f,idr = %d\n", frame->duration, frame->sliceHeader.nalu.IdrPicFlag);
                     /*获取到完整的一帧,做对应操作*/
 
-                    ret = ts.writeVideo(frame);
+                    ret = ts.writeTransportStream(frame, transportStreamPacketNumber);
                     if (ret < 0) {
                         fprintf(stderr, "ts.writeVideo 失败\n");
                         return -1;
@@ -565,7 +568,7 @@ int Rtsp::disposeRtpData(uint8_t *rtpBuffer, uint32_t rtpBufferSize, uint8_t cha
 
             if (nalReader.pictureFinishFlag) {
                 //printf("video duration = %f,idr = %d\n", frame->duration, frame->sliceHeader.nalu.IdrPicFlag);
-                ret = ts.writeVideo(frame);
+                ret = ts.writeTransportStream(frame, transportStreamPacketNumber);
                 if (ret < 0) {
                     fprintf(stderr, "ts.writeVideo 失败\n");
                     return -1;
@@ -609,6 +612,101 @@ int Rtsp::disposeRtpData(uint8_t *rtpBuffer, uint32_t rtpBufferSize, uint8_t cha
     } else {
         printf("rtcp channel = %d\n", channel);
     }
+
+    return 0;
+}
+
+
+/*int Rtsp::packageTransportStream(const NALPicture *picture) {
+    if (picture->sliceHeader.nalu.IdrPicFlag) {
+        transportStreamFileSystem.close();
+        std::string newName = "test" + std::to_string(packetNumber++) + ".ts";
+        double duration = picture->duration - lastDuration;
+        list.push_back({newName, duration});
+        transportStreamFileSystem.open(dir + newName, std::ios::binary | std::ios::out | std::ios::trunc);
+        if (!transportStreamFileSystem.is_open()) {
+            fprintf(stderr, "cloud not open %s\n", (dir + "/test" + std::to_string(packetNumber++) + ".ts").c_str());
+            return -1;
+        }
+
+        ts.writeTable();
+        if (list.size() > 3) {
+            char m3u8Buffer[200]{0};
+            TransportStreamInfo info1 = list[list.size() - 1];
+            TransportStreamInfo info2 = list[list.size() - 2];
+            TransportStreamInfo info3 = list[list.size() - 3];
+            double maxDuration = std::max(info3.duration, std::max(info1.duration, info2.duration));
+
+            indexFs.seekp(0, std::ios::beg);
+            indexFs.write("", 0);
+
+
+            sprintf(m3u8Buffer,
+                    "#EXTM3U\r\n"
+                    "#EXT-X-VERSION:3\r\n"
+                    "#EXT-X-TARGETDURATION:%f\r\n"
+                    "#EXT-X-MEDIA-SEQUENCE:%d\r\n"
+                    "#EXTINF:%f,\r\n"
+                    "%s\r\n"
+                    "#EXTINF:%f,\r\n"
+                    "%s\r\n"
+                    "#EXTINF:%f,\r\n"
+                    "%s\r\n",
+                    maxDuration,
+                    seq++,
+                    info3.duration,
+                    info3.name.c_str(),
+                    info2.duration,
+                    info2.name.c_str(),
+                    info1.duration,
+                    info1.name.c_str()
+            );
+            printf("%s", m3u8Buffer);
+            printf("------------\n");
+            indexFs.write(m3u8Buffer, (int) strlen(m3u8Buffer));
+        }
+
+    }
+}*/
+
+int Rtsp::sendVideo1() {
+
+    DemuxPacket demux;
+    std::ifstream fs;
+    uint8_t buffer[TRANSPORT_STREAM_PACKETS_SIZE];
+    uint32_t size = 0;
+    uint32_t packetNumber = 0;
+
+    std::string mame;
+
+    bool flag;
+    while (true) {
+
+        if (size != TRANSPORT_STREAM_PACKETS_SIZE) {
+            fs.close();
+            mame = "test" + std::to_string(packetNumber++) + ".ts";
+            fs.open("test/" + mame, std::ios::out | std::ios::binary);
+            if (!fs.is_open()) {
+                fprintf(stderr, "open %s failed\n", ("test/" + mame).c_str());
+                return -1;
+            }
+            flag = true;
+        } else {
+            flag = false;
+        }
+        fs.read(reinterpret_cast<char *>(buffer), TRANSPORT_STREAM_PACKETS_SIZE);
+        size = fs.gcount();
+        ReadStream rs(buffer, TRANSPORT_STREAM_PACKETS_SIZE);
+        demux.readVideoFrame(rs);
+
+
+    }
+
+    /* fs.open("test/", std::ios::out | std::ios::binary);
+     if (!fs.is_open()) {
+         fprintf(stderr, "open %s failed\n", filename);
+         return -1;
+     }*/
 
     return 0;
 }
@@ -942,6 +1040,7 @@ Rtsp::~Rtsp() {
         delete audioThread;
     }
 }
+
 
 
 

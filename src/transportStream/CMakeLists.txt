@@ -3,7 +3,7 @@
 
 
 
-add_library(transportStream OBJECT transportPacket.cpp SI.cpp PES.cpp)
+add_library(transportStream OBJECT transportPacket.cpp demuxPacket.cpp SI.cpp PES.cpp)
 
 
 target_include_directories(transportStream

@@ -9,4 +9,8 @@ add_library(
 
 target_include_directories(nalu
         PRIVATE ${PROJECT_SOURCE_DIR}/src/bitStream
+        PRIVATE ${PROJECT_SOURCE_DIR}/src/transportStream
         )
+
+
+target_link_libraries(nalu PRIVATE transportStream)

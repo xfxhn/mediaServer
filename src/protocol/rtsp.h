@@ -62,6 +62,8 @@ private:
     /* bytes 8-11 */
     /*用于标识同步信源。该标识符是随机选择的，参加同一视频会议的两个同步信源不能有相同的SSRC*/
     uint32_t ssrc{0};
+
+
     struct {
         std::string version;
         std::map<std::string, std::string> origin;
@@ -116,11 +118,25 @@ public:
     ~Rtsp();
 
 private:
+    /*当前写到第几个ts包了*/
+    uint32_t transportStreamPacketNumber{0};
+
+    /* std::string dir{"test/"};
+     double lastDuration{0};
+     uint32_t packetNumber{0};
+     std::ofstream transportStreamFileSystem;
+     std::vector<TransportStreamInfo> list;
+
+     int packageTransportStream(const NALPicture *picture);*/
+
+
     int receiveData(std::string &packet);
 
     int getRtpHeader(ReadStream &rs);
 
     int sendVideo();
+
+    int sendVideo1();
 
     int sendAudio();
 

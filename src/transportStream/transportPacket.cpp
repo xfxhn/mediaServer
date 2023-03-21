@@ -25,36 +25,32 @@ static uint8_t fillByte = 0xFF;
 
 int TransportPacket::init(const char *path) {
 
-    /*fs.open("test/test0.ts", std::ios::binary | std::ios::out | std::ios::trunc);
-    if (!fs.is_open()) {
-        fprintf(stderr, "cloud not open %s\n", "test/test0.ts");
-        return -1;
-    }*/
     dir = path;
     buffer = new uint8_t[TRANSPORT_STREAM_PACKETS_SIZE];
     ws = new WriteStream(buffer, TRANSPORT_STREAM_PACKETS_SIZE);
 
 
-    indexFs.open(dir + "test.m3u8", std::ios::binary | std::ios::out | std::ios::trunc);
-    if (!indexFs.is_open()) {
+    m3u8FileSystem.open(dir + "test.m3u8", std::ios::binary | std::ios::out | std::ios::trunc);
+    if (!m3u8FileSystem.is_open()) {
         fprintf(stderr, "cloud not open %s\n", (dir + "test.m3u8").c_str());
         return -1;
     }
     return 0;
 }
 
-int TransportPacket::writeVideo(const NALPicture *picture) {
+int TransportPacket::writeTransportStream(const NALPicture *picture, uint32_t &transportStreamPacketNumber) {
     int ret;
     if (picture->sliceHeader.nalu.IdrPicFlag) {
-        fs.close();
+        transportStreamFileSystem.close();
 
-        std::string newName = "test" + std::to_string(packetNumber++) + ".ts";
+        std::string newName = "test" + std::to_string(transportStreamPacketNumber++) + ".ts";
         /*当前的时间减去上个切片的时间*/
         double duration = picture->duration - lastDuration;
         list.push_back({newName, duration});
-        fs.open(dir + newName, std::ios::binary | std::ios::out | std::ios::trunc);
-        if (!fs.is_open()) {
-            fprintf(stderr, "cloud not open %s\n", (dir + "/test" + std::to_string(packetNumber++) + ".ts").c_str());
+        transportStreamFileSystem.open(dir + newName, std::ios::binary | std::ios::out | std::ios::trunc);
+        if (!transportStreamFileSystem.is_open()) {
+            fprintf(stderr, "cloud not open %s\n",
+                    (dir + "/test" + std::to_string(transportStreamPacketNumber) + ".ts").c_str());
             return -1;
         }
         writeTable();
@@ -66,8 +62,8 @@ int TransportPacket::writeVideo(const NALPicture *picture) {
             TransportStreamInfo info3 = list[list.size() - 3];
             double maxDuration = std::max(info3.duration, std::max(info1.duration, info2.duration));
 
-            indexFs.seekp(0, std::ios::beg);
-            indexFs.write("", 0);
+            m3u8FileSystem.seekp(0, std::ios::beg);
+            m3u8FileSystem.write("", 0);
 
 
             sprintf(m3u8Buffer,
@@ -92,7 +88,7 @@ int TransportPacket::writeVideo(const NALPicture *picture) {
             );
             printf("%s", m3u8Buffer);
             printf("------------\n");
-            indexFs.write(m3u8Buffer, strlen(m3u8Buffer));
+            m3u8FileSystem.write(m3u8Buffer, (int) strlen(m3u8Buffer));
         }
 
         if (list.size() > 10) {
@@ -117,13 +113,13 @@ int TransportPacket::writeVideo(const NALPicture *picture) {
 
 int TransportPacket::writeTable() {
     writeServiceDescriptionTable();
-    fs.write(reinterpret_cast<const char *>(buffer), TRANSPORT_STREAM_PACKETS_SIZE);
+    transportStreamFileSystem.write(reinterpret_cast<const char *>(buffer), TRANSPORT_STREAM_PACKETS_SIZE);
 
     writeProgramAssociationTable();
-    fs.write(reinterpret_cast<const char *>(buffer), TRANSPORT_STREAM_PACKETS_SIZE);
+    transportStreamFileSystem.write(reinterpret_cast<const char *>(buffer), TRANSPORT_STREAM_PACKETS_SIZE);
 
     writeProgramMapTable();
-    fs.write(reinterpret_cast<const char *>(buffer), TRANSPORT_STREAM_PACKETS_SIZE);
+    transportStreamFileSystem.write(reinterpret_cast<const char *>(buffer), TRANSPORT_STREAM_PACKETS_SIZE);
     return 0;
 }
 
@@ -230,6 +226,7 @@ int TransportPacket::writeProgramMapTable() {
 /*	访问单元分隔符*/
 static constexpr uint8_t accessUnitSeparator[6] = {0x00, 0x00, 0x00, 0x01, 0x09, 0xf0};
 
+
 int TransportPacket::writeVideoFrame(const NALPicture *picture) {
     if (!ws) {
         fprintf(stderr, "请初始化\n");
@@ -249,7 +246,7 @@ int TransportPacket::writeVideoFrame(const NALPicture *picture) {
     time = picture->pcr;
     /*写入ts头*/
     setTransportPacketConfig(1, info.pmt.videoPid, 3, videoPacketSize++);
-    /*19是pes头的大小，5是ts头4字节加上Length1字节，7是field那些字段占据的字节数,6是固定的访问单元分隔符*/
+    /*19是pes头的大小，5是ts头4字节加上Length 1字节，7是field那些字段占据的字节数,6是固定的访问单元分隔符*/
     if (totalByteSize <= 188 - 5 - 19 - 7 - 6) {
         /*需要填充多少字节*/
         uint16_t adaptationFieldLength = 188 - 5 - 19 - totalByteSize - 6;
@@ -266,15 +263,16 @@ int TransportPacket::writeVideoFrame(const NALPicture *picture) {
 
 
     /*先写入ts层和pes头*/
-    fs.write(reinterpret_cast<const char *>(ws->bufferStart), ws->position);
-    fs.write(reinterpret_cast<const char *>(accessUnitSeparator), 6);
+    transportStreamFileSystem.write(reinterpret_cast<const char *>(ws->bufferStart), ws->position);
+    transportStreamFileSystem.write(reinterpret_cast<const char *>(accessUnitSeparator), 6);
     ws->setBytePtr(6);
     /*还有多少空闲字节*/
     unoccupiedByte = ws->bufferSize - ws->position;
     /*这个循环只是把188里剩余的字节给填满*/
     while (unoccupiedByte > 0) {
         if (unoccupiedByte < iSize) {
-            fs.write(reinterpret_cast<const char *>(picture->data[i].data + offset), unoccupiedByte);
+            transportStreamFileSystem.write(reinterpret_cast<const char *>(picture->data[i].data + offset),
+                                            unoccupiedByte);
 
             offset += unoccupiedByte;
             iSize -= unoccupiedByte;
@@ -282,7 +280,7 @@ int TransportPacket::writeVideoFrame(const NALPicture *picture) {
             unoccupiedByte = 0;
         } else {
             /*空闲字节大于等于这个nalu的大小*/
-            fs.write(reinterpret_cast<const char *>(picture->data[i].data + offset), iSize);
+            transportStreamFileSystem.write(reinterpret_cast<const char *>(picture->data[i].data + offset), iSize);
 
             unoccupiedByte -= iSize;
             totalByteSize -= iSize;
@@ -303,14 +301,15 @@ int TransportPacket::writeVideoFrame(const NALPicture *picture) {
         transport_packet();
 
         /*先写入ts层和pes头*/
-        fs.write(reinterpret_cast<const char *>(ws->bufferStart), ws->position);
+        transportStreamFileSystem.write(reinterpret_cast<const char *>(ws->bufferStart), ws->position);
         /*还有多少空闲字节*/
         unoccupiedByte = ws->bufferSize - ws->position;
 
         /*这个循环只是把188里剩余的字节给填满*/
         while (unoccupiedByte > 0) {
             if (unoccupiedByte < iSize) {
-                fs.write(reinterpret_cast<const char *>(picture->data[i].data + offset), unoccupiedByte);
+                transportStreamFileSystem.write(reinterpret_cast<const char *>(picture->data[i].data + offset),
+                                                unoccupiedByte);
 
                 offset += unoccupiedByte;
                 iSize -= unoccupiedByte;
@@ -318,7 +317,7 @@ int TransportPacket::writeVideoFrame(const NALPicture *picture) {
                 unoccupiedByte = 0;
             } else {
                 /*空闲字节大于等于这个nalu的大小*/
-                fs.write(reinterpret_cast<const char *>(picture->data[i].data + offset), iSize);
+                transportStreamFileSystem.write(reinterpret_cast<const char *>(picture->data[i].data + offset), iSize);
 
                 unoccupiedByte -= iSize;
                 totalByteSize -= iSize;
@@ -333,21 +332,22 @@ int TransportPacket::writeVideoFrame(const NALPicture *picture) {
     /*写入剩余的数据*/
     if (totalByteSize > 0) {
         ws->reset();
-        /*5是ts层4字节和 adaptation_field_length 1字节，固定5字节*/
+        /*5是ts层4字节和 adaptation_field_length 1字节，固定5字节,1是我定义的私有字段，表示这个ts包是这帧结束*/
         uint16_t adaptationFieldLength = 188 - 5 - totalByteSize;
         setTransportPacketConfig(0, info.pmt.videoPid, 3, videoPacketSize++);
-        setAdaptationFieldConfig(0, adaptationFieldLength, false);
+        setAdaptationFieldConfig(false, adaptationFieldLength, false);
         transport_packet();
 
-        fs.write(reinterpret_cast<const char *>(ws->bufferStart), ws->position);
+        transportStreamFileSystem.write(reinterpret_cast<const char *>(ws->bufferStart), ws->position);
         /*这里从1开始，因为跟在adaptation_field_length后面的那些参数有一字节*/
         for (int j = 1; j < adaptationFieldLength; ++j) {
-            fs.write(reinterpret_cast<const char *>(&fillByte), 1);
+            transportStreamFileSystem.write(reinterpret_cast<const char *>(&fillByte), 1);
         }
 
-        fs.write(reinterpret_cast<const char *>(picture->data[i].data + offset), iSize);
+        transportStreamFileSystem.write(reinterpret_cast<const char *>(picture->data[i].data + offset), iSize);
         for (int j = i + 1; j < picture->data.size(); ++j) {
-            fs.write(reinterpret_cast<const char *>(picture->data[j].data), picture->data[j].nalUintSize);
+            transportStreamFileSystem.write(reinterpret_cast<const char *>(picture->data[j].data),
+                                            picture->data[j].nalUintSize);
         }
 
     }
@@ -388,11 +388,11 @@ int TransportPacket::writeAudioFrame(const AdtsHeader &header) {
     pes.set_PTS_DTS_flags(2, header.pts, header.dts);
     pes.PES_packet(ws);
 
-    fs.write(reinterpret_cast<const char *>(ws->bufferStart), ws->position);
+    transportStreamFileSystem.write(reinterpret_cast<const char *>(ws->bufferStart), ws->position);
 
     /*还有多少空闲字节*/
     unoccupiedByte = ws->bufferSize - ws->position;
-    fs.write(reinterpret_cast<const char *>(data + offset), unoccupiedByte);
+    transportStreamFileSystem.write(reinterpret_cast<const char *>(data + offset), unoccupiedByte);
     totalByteSize -= unoccupiedByte;
     offset += unoccupiedByte;
 
@@ -408,12 +408,12 @@ int TransportPacket::writeAudioFrame(const AdtsHeader &header) {
         transport_packet();
 
         /*先写入ts层和pes头*/
-        fs.write(reinterpret_cast<const char *>(ws->bufferStart), ws->position);
+        transportStreamFileSystem.write(reinterpret_cast<const char *>(ws->bufferStart), ws->position);
         /*还有多少空闲字节*/
         unoccupiedByte = ws->bufferSize - ws->position;
 
 
-        fs.write(reinterpret_cast<const char *>(data + offset), unoccupiedByte);
+        transportStreamFileSystem.write(reinterpret_cast<const char *>(data + offset), unoccupiedByte);
         offset += unoccupiedByte;
         totalByteSize -= unoccupiedByte;
 
@@ -428,13 +428,13 @@ int TransportPacket::writeAudioFrame(const AdtsHeader &header) {
         setAdaptationFieldConfig(1, adaptationFieldLength, false);
         transport_packet();
 
-        fs.write(reinterpret_cast<const char *>(ws->bufferStart), ws->position);
+        transportStreamFileSystem.write(reinterpret_cast<const char *>(ws->bufferStart), ws->position);
         /*这里从1开始，因为跟在adaptation_field_length后面的那些参数有一字节*/
         for (int j = 1; j < adaptationFieldLength; ++j) {
-            fs.write(reinterpret_cast<const char *>(&fillByte), 1);
+            transportStreamFileSystem.write(reinterpret_cast<const char *>(&fillByte), 1);
         }
 
-        fs.write(reinterpret_cast<const char *>(data + offset), totalByteSize);
+        transportStreamFileSystem.write(reinterpret_cast<const char *>(data + offset), totalByteSize);
     }
     return 0;
 }
@@ -503,9 +503,12 @@ TransportPacket::setAdaptationFieldConfig(uint8_t randomAccessIndicator, uint16_
 TransportPacket::~TransportPacket() {
     delete[] buffer;
     delete ws;
-    fs.close();
-    indexFs.close();
+    transportStreamFileSystem.close();
+    m3u8FileSystem.close();
 }
+
+
+
 
 
 

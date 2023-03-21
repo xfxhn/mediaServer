@@ -10,8 +10,8 @@
 #include "SI.h"
 #include "PES.h"
 #include "writeStream.h"
+#include "readStream.h"
 
-class WriteStream;
 
 class NALPicture;
 
@@ -23,17 +23,21 @@ struct TransportStreamInfo {
 };
 
 class TransportPacket {
+
 private:
+    uint8_t *buffer{nullptr};
+    WriteStream *ws{nullptr};
+    std::string dir;
     uint32_t seq{0};
     double lastDuration{0};
 
-    std::ofstream indexFs;
+    std::ofstream m3u8FileSystem;
+    std::ofstream transportStreamFileSystem;
     std::vector<TransportStreamInfo> list;
-    int packetNumber{0};
-    std::string dir;
-    std::ofstream fs;
-    uint8_t *buffer{nullptr};
-    WriteStream *ws{nullptr};
+    /*int packetNumber{0};*/
+
+
+
 
     PES pes;
     SI info;
@@ -91,16 +95,9 @@ private:
 public:
     int init(const char *path);
 
-    int writeVideo(const NALPicture *picture);
-
     int writeTable();
 
-    int writeServiceDescriptionTable();
-
-    int writeProgramAssociationTable();
-
-    int writeProgramMapTable();
-
+    int writeTransportStream(const NALPicture *picture, uint32_t &transportStreamPacketNumber);
 
     int writeVideoFrame(const NALPicture *picture);
 
@@ -109,7 +106,11 @@ public:
     ~TransportPacket();
 
 private:
+    int writeServiceDescriptionTable();
 
+    int writeProgramAssociationTable();
+
+    int writeProgramMapTable();
 
     int transport_packet() const;
 
@@ -118,6 +119,7 @@ private:
     int setAdaptationFieldConfig(uint8_t randomAccessIndicator, uint16_t adaptationFieldLength, bool flag);
 
     int adaptation_field() const;
+
 };
 
 

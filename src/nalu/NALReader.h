@@ -9,6 +9,9 @@
 #include "NALPicture.h"
 #include "NALDecodedPictureBuffer.h"
 
+
+#include "demuxPacket.h"
+
 enum NalUintType {
     H264_NAL_UNSPECIFIED = 0,
     H264_NAL_SLICE = 1,
@@ -31,7 +34,9 @@ public:
     uint8_t ppsSize{0};
 
 private:
-
+    uint8_t transportStreamBuffer[188];
+    DemuxPacket demux;
+    uint32_t currentPacket{0};
     std::ifstream fs;
     uint8_t *bufferStart{nullptr};
     uint8_t *bufferPosition{nullptr};
@@ -53,24 +58,18 @@ private:
     NALPictureParameterSet ppsList[256];
 
 
-private:
-    static int getNextStartCode(uint8_t *bufPtr, const uint8_t *end, uint8_t *&pos1, uint8_t *&pos2, int &startCodeLen1,
-                                int &startCodeLen2);
-
-    void computedTimestamp(NALPicture *picture);
-
 public:
 
 
     int init(const char *filename);
 
+    int init1(const std::string &dir, uint32_t transportStreamPacketNumber);
+
+    int readNalUint1(uint8_t *&data, uint32_t &size);
+
     int readNalUint(uint8_t *&data, uint32_t &size, int &startCodeLength, bool &isStopLoop);
 
     int getVideoFrame(NALPicture *&picture, bool &flag);
-
-    int test(NALPicture *&picture, bool &flag);
-
-    int putNalUintData(NALPicture *&picture, uint8_t *data, uint32_t size);
 
 
     int test1(NALPicture *&picture, uint8_t *data, uint32_t size);
@@ -81,6 +80,16 @@ public:
 
 
     ~NALReader();
+
+private:
+
+
+    int getNalUintData();
+
+    static int getNextStartCode(uint8_t *bufPtr, const uint8_t *end, uint8_t *&pos1, uint8_t *&pos2, int &startCodeLen1,
+                                int &startCodeLen2);
+
+    void computedTimestamp(NALPicture *picture);
 };
 
 

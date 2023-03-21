@@ -5,6 +5,9 @@
 
 #include <cstdint>
 
+#define VIDEO_PID 256
+#define AUDIO_PID 257
+
 class WriteStream;
 
 enum {
@@ -77,10 +80,10 @@ struct PMT {
     uint8_t current_next_indicator{1};
     uint8_t section_number{0};
     uint8_t last_section_number{0};
-    uint16_t PCR_PID{256};/*0x1FFF*/
+    uint16_t PCR_PID{VIDEO_PID};/*0x1FFF*/
 
-    uint16_t videoPid{256};
-    uint16_t audioPid{257};
+    uint16_t videoPid{VIDEO_PID};
+    uint16_t audioPid{AUDIO_PID};
     /*uint32_t CRC_32{0};*/
 
 
