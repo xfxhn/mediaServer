@@ -41,16 +41,18 @@ int TransportPacket::init(const char *path) {
 int TransportPacket::writeTransportStream(const NALPicture *picture, uint32_t &transportStreamPacketNumber) {
     int ret;
     if (picture->sliceHeader.nalu.IdrPicFlag) {
+        videoPacketSize = 0;
+        audioPacketSize = 0;
         transportStreamFileSystem.close();
 
-        std::string newName = "test" + std::to_string(transportStreamPacketNumber++) + ".ts";
+        std::string name = "test" + std::to_string(transportStreamPacketNumber++) + ".ts";
         /*当前的时间减去上个切片的时间*/
         double duration = picture->duration - lastDuration;
-        list.push_back({newName, duration});
-        transportStreamFileSystem.open(dir + newName, std::ios::binary | std::ios::out | std::ios::trunc);
+        list.push_back({name, duration});
+        transportStreamFileSystem.open(dir + name, std::ios::binary | std::ios::out | std::ios::trunc);
         if (!transportStreamFileSystem.is_open()) {
             fprintf(stderr, "cloud not open %s\n",
-                    (dir + "/test" + std::to_string(transportStreamPacketNumber) + ".ts").c_str());
+                    ("test" + std::to_string(transportStreamPacketNumber) + ".ts").c_str());
             return -1;
         }
         writeTable();
@@ -111,17 +113,6 @@ int TransportPacket::writeTransportStream(const NALPicture *picture, uint32_t &t
     return 0;
 }
 
-int TransportPacket::writeTable() {
-    writeServiceDescriptionTable();
-    transportStreamFileSystem.write(reinterpret_cast<const char *>(buffer), TRANSPORT_STREAM_PACKETS_SIZE);
-
-    writeProgramAssociationTable();
-    transportStreamFileSystem.write(reinterpret_cast<const char *>(buffer), TRANSPORT_STREAM_PACKETS_SIZE);
-
-    writeProgramMapTable();
-    transportStreamFileSystem.write(reinterpret_cast<const char *>(buffer), TRANSPORT_STREAM_PACKETS_SIZE);
-    return 0;
-}
 
 int TransportPacket::transport_packet() const {
     ws->writeMultiBit(8, sync_byte);
@@ -177,6 +168,18 @@ int TransportPacket::transport_packet() const {
 */
 
 
+    return 0;
+}
+
+int TransportPacket::writeTable() {
+    writeServiceDescriptionTable();
+    transportStreamFileSystem.write(reinterpret_cast<const char *>(buffer), TRANSPORT_STREAM_PACKETS_SIZE);
+
+    writeProgramAssociationTable();
+    transportStreamFileSystem.write(reinterpret_cast<const char *>(buffer), TRANSPORT_STREAM_PACKETS_SIZE);
+
+    writeProgramMapTable();
+    transportStreamFileSystem.write(reinterpret_cast<const char *>(buffer), TRANSPORT_STREAM_PACKETS_SIZE);
     return 0;
 }
 
@@ -247,9 +250,10 @@ int TransportPacket::writeVideoFrame(const NALPicture *picture) {
     /*写入ts头*/
     setTransportPacketConfig(1, info.pmt.videoPid, 3, videoPacketSize++);
     /*19是pes头的大小，5是ts头4字节加上Length 1字节，7是field那些字段占据的字节数,6是固定的访问单元分隔符*/
-    if (totalByteSize <= 188 - 5 - 19 - 7 - 6) {
+    /*totalByteSize <= 188 - 5 - 19 - 7 - 6*/
+    if (totalByteSize <= 188 - 5 - 19 - 7) {
         /*需要填充多少字节*/
-        uint16_t adaptationFieldLength = 188 - 5 - 19 - totalByteSize - 6;
+        uint16_t adaptationFieldLength = 188 - 5 - 19 - totalByteSize;
         setAdaptationFieldConfig(picture->sliceHeader.nalu.IdrPicFlag, adaptationFieldLength, true);
         transport_packet();
         ws->paddingByte(adaptationFieldLength - 7, 0xFF);
@@ -264,8 +268,8 @@ int TransportPacket::writeVideoFrame(const NALPicture *picture) {
 
     /*先写入ts层和pes头*/
     transportStreamFileSystem.write(reinterpret_cast<const char *>(ws->bufferStart), ws->position);
-    transportStreamFileSystem.write(reinterpret_cast<const char *>(accessUnitSeparator), 6);
-    ws->setBytePtr(6);
+    /*transportStreamFileSystem.write(reinterpret_cast<const char *>(accessUnitSeparator), 6);
+    ws->setBytePtr(6);*/
     /*还有多少空闲字节*/
     unoccupiedByte = ws->bufferSize - ws->position;
     /*这个循环只是把188里剩余的字节给填满*/

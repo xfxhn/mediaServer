@@ -2,6 +2,7 @@
 #include "readStream.h"
 
 
+
 static uint64_t av_rescale_q(uint64_t a, const AVRational &bq, const AVRational &cq) {
     //(1 / 25) / (1 / 1000);
     int64_t b = bq.num * cq.den;
@@ -52,23 +53,20 @@ int NALReader::init1(const std::string &dir, uint32_t transportStreamPacketNumbe
     }
 
     bufferStart = new uint8_t[MAX_BUFFER_SIZE];
-    //fs.read(reinterpret_cast<char *>(bufferStart), MAX_BUFFER_SIZE);
-    //fs.gcount();
+
     blockBufferSize = 0;
-    // bufferPosition = bufferStart;
-    //bufferEnd = bufferStart + blockBufferSize - 1;
 
     return 0;
 }
 
-int NALReader::getNalUintData() {
+int NALReader::getTransportStreamData() {
     int ret;
 
     while (true) {
-        fs.read(reinterpret_cast<char *>(transportStreamBuffer), 188);
+        fs.read(reinterpret_cast<char *>(transportStreamBuffer), TRANSPORT_STREAM_PACKETS_SIZE);
         uint32_t size = fs.gcount();
         // bufferPosition += size;
-        if (size != 188) {
+        if (size != TRANSPORT_STREAM_PACKETS_SIZE) {
             /*表示这个文件读完了，读下一个*/
             /*这里ts文件，应该就是188的倍数，不是188的倍数，这个文件是有问题*/
             fs.close();
@@ -79,9 +77,9 @@ int NALReader::getNalUintData() {
                 return -1;
             }
 
-            fs.read(reinterpret_cast<char *>(transportStreamBuffer), 188);
+            fs.read(reinterpret_cast<char *>(transportStreamBuffer), TRANSPORT_STREAM_PACKETS_SIZE);
             size = fs.gcount();
-            if (size != 188) {
+            if (size != TRANSPORT_STREAM_PACKETS_SIZE) {
                 fprintf(stderr, "没读到一个ts包的大小，read size = %d\n", size);
                 return -1;
             }
@@ -96,7 +94,7 @@ int NALReader::getNalUintData() {
             size = rs.size - rs.position;
             memcpy(bufferStart + blockBufferSize, rs.currentPtr, size);
             blockBufferSize += size;
-            bufferEnd = bufferStart + blockBufferSize - 1;
+            bufferEnd = bufferStart + blockBufferSize;
             break;
         }
 
@@ -107,65 +105,87 @@ int NALReader::getNalUintData() {
 
 int NALReader::readNalUint1(uint8_t *&data, uint32_t &size) {
     int ret;
+    uint8_t *pos1 = nullptr;
+    uint8_t *pos2 = nullptr;
+    int startCodeLen1 = 0;
+    int startCodeLen2 = 0;
     while (true) {
-        uint8_t *pos1 = nullptr;
-        uint8_t *pos2 = nullptr;
-        int startCodeLen1 = 0;
-        int startCodeLen2 = 0;
+        ret = findNALU(pos1, pos2, startCodeLen1, startCodeLen2);
 
-        /*  const int type = getNextStartCode(bufferPosition, bufferEnd,
-                                            pos1, pos2, startCodeLen1, startCodeLen2);*/
-        const int type = getNextStartCode(bufferStart, bufferEnd,
-                                          pos1, pos2, startCodeLen1, startCodeLen2);
-        //  startCodeLength = startCodeLen1;
-
-
-
-        /*已经读取了多少个字节*/
-        //    uint32_t readSize = blockBufferSize - residual;
         /*如果没找到就要继续往buffer里面塞数据，直到找到为止*/
-        if (type == 1) { //表示找到了开头的startCode,没找到后面的
-            /*memcpy(bufferStart, pos1, residual);*/
-            //每次读File::MAX_BUFFER_SIZE个，这里读取的NALU必须要包含一整个slice,字节对齐
-            /*fs.read(reinterpret_cast<char *>(bufferStart + residual), readSize);
-            uint32_t bufferSize = fs.gcount();*/
+        if (ret == 1) { //表示找到了开头的startCode,没找到后面的
 
-
-            // uint32_t size = 0;
-            ret = getNalUintData();
+            ret = getTransportStreamData();
             if (ret < 0) {
                 return ret;
             }
-//            if (bufferSize == 0) {
-//                //表示读完数据了
-//                size = residual - startCodeLen1;
-//                data = bufferStart + startCodeLen1;
-//                isStopLoop = false;
-//                break;
-//            }
-//            blockBufferSize = residual + bufferSize;
-//            bufferPosition = bufferStart;
-//            bufferEnd = bufferStart + blockBufferSize - 1;
-        } else if (type == 2) {//都找到了
-            data = pos1 + startCodeLen1;
+        } else if (ret == 2) {//都找到了
+//            data = pos1 + startCodeLen1;
+            data = pos1;
             size = pos2 - data;
             /*还剩多少字节未读取*/
-            uint32_t residual = (bufferEnd - pos1 + 1);
+            uint32_t residual = bufferEnd - pos2;
             //   bufferPosition = pos2;// data + size;
             /*找到了nalu，那么就把还没有读取的数据放在前面来*/
             memcpy(bufferStart, pos2, residual);
             blockBufferSize = residual;
-            bufferPosition = pos2;
-            bufferEnd = bufferStart + residual - 1;
+            //bufferPosition = pos2;
+            bufferEnd = bufferStart + residual;
             break;
         } else {
             //错误
             fprintf(stderr, "没有找到开头startCode，也没有找到后面的startCode\n");
-            //isStopLoop = false;
             return -1;
         }
     }
     return 0;
+}
+
+int NALReader::findNALU(uint8_t *&pos1, uint8_t *&pos2, int &startCodeLen1, int &startCodeLen2) {
+
+    if (!bufferStart) {
+        fprintf(stderr, "请初始化\n");
+        return -1;
+    }
+
+    if (blockBufferSize == 0) {
+        return 1;
+    }
+    startCodeLen1 = 0;
+    startCodeLen2 = 0;
+    uint32_t pos = 0;
+    while (pos + 3 < blockBufferSize) {
+        if (bufferStart[pos] == 0 && bufferStart[pos + 1] == 0 && bufferStart[pos + 2] == 1) {
+            startCodeLen1 = 3;
+            break;
+        } else if (bufferStart[pos] == 0 && bufferStart[pos + 1] == 0 && bufferStart[pos + 2] == 0 &&
+                   bufferStart[pos + 3] == 1) {
+            startCodeLen1 = 4;
+            break;
+        }
+        pos++;
+    }
+    pos1 = &bufferStart[pos];
+    if (startCodeLen1 == 0) {
+        fprintf(stderr, "没找到start code\n");
+        return -1;
+    }
+
+    pos = pos + startCodeLen1;
+    while (pos + 3 < blockBufferSize) {
+        if (bufferStart[pos] == 0 && bufferStart[pos + 1] == 0 && bufferStart[pos + 2] == 1) {
+            startCodeLen2 = 3;
+            break;
+        } else if (bufferStart[pos] == 0 && bufferStart[pos + 1] == 0 && bufferStart[pos + 2] == 0 &&
+                   bufferStart[pos + 3] == 1) {
+            startCodeLen2 = 4;
+            break;
+        }
+        pos++;
+    }
+    pos2 = &bufferStart[pos];
+
+    return startCodeLen2 == 0 ? 1 : 2;
 }
 
 int NALReader::readNalUint(uint8_t *&data, uint32_t &size, int &startCodeLength, bool &isStopLoop) {
@@ -214,6 +234,7 @@ int NALReader::readNalUint(uint8_t *&data, uint32_t &size, int &startCodeLength,
     }
     return 0;
 }
+
 
 int NALReader::getNextStartCode(uint8_t *bufPtr, const uint8_t *end,
                                 uint8_t *&pos1, uint8_t *&pos2, int &startCodeLen1, int &startCodeLen2) {
@@ -453,8 +474,24 @@ int NALReader::getVideoFrame(NALPicture *&picture, bool &flag) {
     return 0;
 }
 
+int NALReader::getVideoFrame1(NALPicture *&picture) {
+    int ret;
 
-static constexpr uint8_t startCode[4] = {0, 0, 0, 1};
+    uint8_t *data;
+    uint32_t size;
+    ret = readNalUint1(data, size);
+    if (ret < 0) {
+        fprintf(stderr, "读取nalu单元错误\n");
+        return ret;
+    }
+    ret = test1(picture, data, size);
+    if (ret < 0) {
+        fprintf(stderr, "计算picture错误\n");
+        return ret;
+    }
+    return 0;
+}
+
 
 int NALReader::test1(NALPicture *&picture, uint8_t *data, uint32_t size) {
     int ret;
@@ -545,8 +582,6 @@ int NALReader::test1(NALPicture *&picture, uint8_t *data, uint32_t size) {
         picture->size += size;
         picture->data.push_back({size, data, 0});
 
-        //fs1.write(reinterpret_cast<const char *>(picture->data[0].data), picture->data[0].nalUintSize);
-
         pictureFinishFlag = true;
     } else if (nalUnitHeader.nal_unit_type == H264_NAL_IDR_SLICE) {
 
@@ -594,16 +629,13 @@ int NALReader::test1(NALPicture *&picture, uint8_t *data, uint32_t size) {
 
         picture->size += spsSize;
         picture->data.push_back({spsSize, spsData, 1});
-        //fs1.write(reinterpret_cast<const char *>(spsData), spsSize);
 
 
         picture->size += ppsSize;
         picture->data.push_back({ppsSize, ppsData, 2});
-        //fs1.write(reinterpret_cast<const char *>(ppsData), ppsSize);
 
         picture->size += size;
         picture->data.push_back({size, data, 3});
-        //fs1.write(reinterpret_cast<const char *>(picture->data[2].data), picture->data[2].nalUintSize);
         pictureFinishFlag = true;
     } else {
         fprintf(stderr, "其他type\n");

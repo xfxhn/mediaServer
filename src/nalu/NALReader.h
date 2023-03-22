@@ -12,6 +12,8 @@
 
 #include "demuxPacket.h"
 
+#define TRANSPORT_STREAM_PACKETS_SIZE 188
+
 enum NalUintType {
     H264_NAL_UNSPECIFIED = 0,
     H264_NAL_SLICE = 1,
@@ -34,29 +36,30 @@ public:
     uint8_t ppsSize{0};
 
 private:
-    uint8_t transportStreamBuffer[188];
+    /*读取ts文件用的一些参数*/
+    uint8_t transportStreamBuffer[TRANSPORT_STREAM_PACKETS_SIZE];
     DemuxPacket demux;
     uint32_t currentPacket{0};
+
+
     std::ifstream fs;
     uint8_t *bufferStart{nullptr};
     uint8_t *bufferPosition{nullptr};
     uint8_t *bufferEnd{nullptr};
     uint32_t blockBufferSize{0};
 
-    NALPicture *unoccupiedPicture{nullptr};
 private:
-
+    NALPicture *unoccupiedPicture{nullptr};
     bool finishFlag{false};
     NALHeader nalUnitHeader;
-
     NALDecodedPictureBuffer gop;
 
+    /*计算pts和dts用的*/
     uint64_t videoDecodeFrameNumber{0};
     uint64_t videoDecodeIdrFrameNumber{0};
 
     NALSeqParameterSet spsList[32];
     NALPictureParameterSet ppsList[256];
-
 
 public:
 
@@ -71,6 +74,8 @@ public:
 
     int getVideoFrame(NALPicture *&picture, bool &flag);
 
+    int getVideoFrame1(NALPicture *&picture);
+
 
     int test1(NALPicture *&picture, uint8_t *data, uint32_t size);
 
@@ -82,9 +87,9 @@ public:
     ~NALReader();
 
 private:
+    int findNALU(uint8_t *&pos1, uint8_t *&pos2, int &startCodeLen1, int &startCodeLen2);
 
-
-    int getNalUintData();
+    int getTransportStreamData();
 
     static int getNextStartCode(uint8_t *bufPtr, const uint8_t *end, uint8_t *&pos1, uint8_t *&pos2, int &startCodeLen1,
                                 int &startCodeLen2);

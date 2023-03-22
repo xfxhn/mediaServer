@@ -1,7 +1,7 @@
 ﻿
 #include "rtsp.h"
 
-
+#include <ctime>
 #include "util.h"
 #include "parseUrl.h"
 
@@ -12,7 +12,7 @@
 
 #include "demuxPacket.h"
 
-#define TRANSPORT_STREAM_PACKETS_SIZE 188
+
 #define RTP_PAYLOAD_TYPE_H264   96
 #define RTP_PAYLOAD_TYPE_AAC    97
 enum {
@@ -599,7 +599,6 @@ int Rtsp::disposeRtpData(uint8_t *rtpBuffer, uint32_t rtpBufferSize, uint8_t cha
 
             adtsReader.putAACData(adtsHeader, rs.currentPtr - 7, aacSize + 7);
 
-
             ret = ts.writeAudioFrame(adtsHeader);
             if (ret < 0) {
                 fprintf(stderr, "写入音频失败\n");
@@ -671,42 +670,6 @@ int Rtsp::disposeRtpData(uint8_t *rtpBuffer, uint32_t rtpBufferSize, uint8_t cha
 
 int Rtsp::sendVideo1() {
 
-    DemuxPacket demux;
-    std::ifstream fs;
-    uint8_t buffer[TRANSPORT_STREAM_PACKETS_SIZE];
-    uint32_t size = 0;
-    uint32_t packetNumber = 0;
-
-    std::string mame;
-
-    bool flag;
-    while (true) {
-
-        if (size != TRANSPORT_STREAM_PACKETS_SIZE) {
-            fs.close();
-            mame = "test" + std::to_string(packetNumber++) + ".ts";
-            fs.open("test/" + mame, std::ios::out | std::ios::binary);
-            if (!fs.is_open()) {
-                fprintf(stderr, "open %s failed\n", ("test/" + mame).c_str());
-                return -1;
-            }
-            flag = true;
-        } else {
-            flag = false;
-        }
-        fs.read(reinterpret_cast<char *>(buffer), TRANSPORT_STREAM_PACKETS_SIZE);
-        size = fs.gcount();
-        ReadStream rs(buffer, TRANSPORT_STREAM_PACKETS_SIZE);
-        demux.readVideoFrame(rs);
-
-
-    }
-
-    /* fs.open("test/", std::ios::out | std::ios::binary);
-     if (!fs.is_open()) {
-         fprintf(stderr, "open %s failed\n", filename);
-         return -1;
-     }*/
 
     return 0;
 }
@@ -715,29 +678,33 @@ int Rtsp::sendVideo1() {
 int Rtsp::sendVideo() {
     int ret;
 
-    RtpPacket videoPacket;
-    videoPacket.init(NALReader::MAX_BUFFER_SIZE, RTP_PAYLOAD_TYPE_H264);
-
-
-    bool flag = true;
+    if (transportStreamPacketNumber <= 0) {
+        fprintf(stderr, "现在还拉不了rtsp流，等一会儿\n");
+        return -1;
+    }
 
     NALReader reader;
-    ret = reader.init("");
+    NALPicture *picture = reader.allocPicture();
+    if (picture == nullptr) {
+        fprintf(stderr, "分配picture失败\n");
+        return -1;
+    }
+    ret = reader.init1(dir, transportStreamPacketNumber - 1);
     if (ret < 0) {
-        fprintf(stderr, "init video failed\n");
-        videoSendError = true;
+        fprintf(stderr, "reader.init1失败\n");
         return ret;
     }
 
-    NALPicture *picture = reader.allocPicture();
-    while (flag) {
-        ret = reader.getVideoFrame(picture, flag);
+    RtpPacket videoPacket;
+    videoPacket.init(NALReader::MAX_BUFFER_SIZE, RTP_PAYLOAD_TYPE_H264);
+    int interval = 1000 / 30;
+    clock_t time = clock();
+    /* todo  这里父线程终止，当前线程也应该退出，释放资源，等会儿做 */
+    while (true) {
+        ret = reader.getVideoFrame1(picture);
         if (ret < 0) {
-            fprintf(stderr, "获取视频帧失败\n");
-            videoSendError = true;
             return ret;
         }
-
         for (int i = 0; i < picture->data.size(); ++i) {
             const Frame &nalUint = picture->data[i];
 
@@ -750,13 +717,55 @@ int Rtsp::sendVideo() {
             }
 
         }
-        // printf("pts = %lld\n", picture->pts);
+
         videoPacket.timestamp = picture->pts;
+        /*如果上面程序用了10毫秒，那么每帧间隔时间，33.33 - 10 = 23.333*/
+        time = clock() - time;
+        std::this_thread::sleep_for(std::chrono::seconds(40 - 20));
 
-
-        std::this_thread::sleep_for(std::chrono::milliseconds(40 - 20));
     }
-    printf("视频发送完成\n");
+    /*  RtpPacket videoPacket;
+      videoPacket.init(NALReader::MAX_BUFFER_SIZE, RTP_PAYLOAD_TYPE_H264);
+
+
+      bool flag = true;
+
+      NALReader reader;
+      ret = reader.init("");
+      if (ret < 0) {
+          fprintf(stderr, "init video failed\n");
+          videoSendError = true;
+          return ret;
+      }
+
+      NALPicture *picture = reader.allocPicture();
+      while (flag) {
+          ret = reader.getVideoFrame(picture, flag);
+          if (ret < 0) {
+              fprintf(stderr, "获取视频帧失败\n");
+              videoSendError = true;
+              return ret;
+          }
+
+          for (int i = 0; i < picture->data.size(); ++i) {
+              const Frame &nalUint = picture->data[i];
+
+              ret = videoPacket.sendVideoFrame(clientSocket, nalUint.data, nalUint.nalUintSize,
+                                               i == (picture->data.size() - 1), videoChannel);
+              if (ret < 0) {
+                  fprintf(stderr, "发送视频数据失败\n");
+                  videoSendError = true;
+                  return ret;
+              }
+
+          }
+          // printf("pts = %lld\n", picture->pts);
+          videoPacket.timestamp = picture->pts;
+
+
+          std::this_thread::sleep_for(std::chrono::milliseconds(40 - 20));
+      }
+      printf("视频发送完成\n");*/
     return 0;
 }
 

@@ -120,8 +120,9 @@ public:
 private:
     /*当前写到第几个ts包了*/
     uint32_t transportStreamPacketNumber{0};
+    std::string dir{"test/"};
 
-    /* std::string dir{"test/"};
+    /*
      double lastDuration{0};
      uint32_t packetNumber{0};
      std::ofstream transportStreamFileSystem;

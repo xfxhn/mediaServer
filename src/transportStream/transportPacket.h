@@ -25,18 +25,16 @@ struct TransportStreamInfo {
 class TransportPacket {
 
 private:
-    uint8_t *buffer{nullptr};
-    WriteStream *ws{nullptr};
     std::string dir;
     uint32_t seq{0};
     double lastDuration{0};
 
+    uint8_t *buffer{nullptr};
+    WriteStream *ws{nullptr};
+
     std::ofstream m3u8FileSystem;
     std::ofstream transportStreamFileSystem;
     std::vector<TransportStreamInfo> list;
-    /*int packetNumber{0};*/
-
-
 
 
     PES pes;
@@ -95,8 +93,6 @@ private:
 public:
     int init(const char *path);
 
-    int writeTable();
-
     int writeTransportStream(const NALPicture *picture, uint32_t &transportStreamPacketNumber);
 
     int writeVideoFrame(const NALPicture *picture);
@@ -106,6 +102,8 @@ public:
     ~TransportPacket();
 
 private:
+    int writeTable();
+
     int writeServiceDescriptionTable();
 
     int writeProgramAssociationTable();
