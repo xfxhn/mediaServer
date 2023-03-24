@@ -24,11 +24,11 @@ private:
 //    std::ofstream fs;
 //    NALDecodedPictureBuffer gop;
     TransportPacket ts;
-
+    AdtsHeader adtsHeader;
     NALPicture *frame{nullptr};
     NALReader nalReader;
     AdtsReader adtsReader;
-    AdtsHeader adtsHeader;
+
 
 private:
 
@@ -64,13 +64,7 @@ private:
     uint32_t ssrc{0};
 
 
-    struct {
-        std::string version;
-        std::map<std::string, std::string> origin;
-        std::string name;
-        std::map<std::string, std::string> timing;
-        std::map<std::string, std::string> media[2];
-    } sdpInfo;
+   
     SOCKET clientSocket;
 
     std::thread *videoThread{nullptr};
@@ -78,11 +72,6 @@ private:
 
     uint8_t videoChannel{0};
     uint8_t audioChannel{0};
-
-    /* uint8_t sps[100];
-     int spsSize{0};
-     uint8_t pps[100];
-     int ppsSize{0};*/
 
 //    uint8_t audioObjectType;
 //    uint8_t samplingFrequencyIndex;
@@ -102,9 +91,9 @@ private:
     //std::vector<uint8_t> pps;
 public:
     bool stopFlag{true};
-    int videoSendError{false};
-    int audioSendError{false};
 
+   /* bool videoSendError{false};
+    bool audioSendError{false};*/
 
     std::string aacConfig;
     std::string sprop_parameter_sets;
@@ -118,8 +107,9 @@ public:
     ~Rtsp();
 
 private:
-    /*当前写到第几个ts包了*/
-    uint32_t transportStreamPacketNumber{0};
+    bool stopVideoSendFlag{true};
+    bool stopAudioSendFlag{true};
+    
     std::string dir{"test/"};
 
     /*
@@ -135,11 +125,10 @@ private:
 
     int getRtpHeader(ReadStream &rs);
 
-    int sendVideo();
+    int sendVideo(uint32_t number);
 
-    int sendVideo1();
 
-    int sendAudio();
+    int sendAudio(uint32_t number);
 
     int parseSdp(const std::string &sdp);
 
@@ -153,6 +142,8 @@ private:
     /*int muxTransportStream(uint8_t channel, uint8_t *data, uint32_t size);*/
 
     int parseAACConfig(const std::string &config);
+
+
 };
 
 

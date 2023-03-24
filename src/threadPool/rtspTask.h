@@ -13,8 +13,6 @@ class RtspTask : public Task {
 private:
     /* TcpSocket &rtsp;*/
     SOCKET clientSocket;
-    const char *videoFilename{""};
-    const char *audioFilename{""};
 
 
 public:
@@ -115,14 +113,18 @@ public:
             }
 
             /*视频发送错误了，退出这个线程*/
-            if (rtsp.videoSendError) {
-                fprintf(stderr, "视频发送错误\n");
-                return -1;
-            }
-            if (rtsp.audioSendError) {
-                fprintf(stderr, "音频发送错误\n");
-                return -1;
-            }
+//            if (rtsp.videoSendError) {
+//                /*主动关闭tcp链接*/
+//                //TcpSocket::closeSocket(clientSocket);
+//                fprintf(stderr, "视频发送错误\n");
+//                return -1;
+//            }
+//            if (rtsp.audioSendError) {
+//                /*主动关闭tcp链接*/
+//                //TcpSocket::closeSocket(clientSocket);
+//                fprintf(stderr, "音频发送错误\n");
+//                return -1;
+//            }
             // 将缓冲区中的数据添加到字符串对象中
             packet.append(buffer, length);
             // 查找分隔符在字符串中的位置

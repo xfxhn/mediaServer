@@ -5,4 +5,5 @@ add_library(configurationRecord audioSpecificConfig.cpp AVCDecoderConfigurationR
 target_include_directories(configurationRecord
         PRIVATE ${PROJECT_SOURCE_DIR}/src/bitStream
         PRIVATE ${PROJECT_SOURCE_DIR}/src/nalu
+        PUBLIC ${PROJECT_SOURCE_DIR}/src/utils
         )

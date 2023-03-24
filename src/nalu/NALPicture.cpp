@@ -191,7 +191,7 @@ int NALPicture::decoding_process_for_picture_order_count_type_2() {
 }
 
 void NALPicture::reset() {
-
+    pictureFinishFlag = false;
     useFlag = false;
     size = 0;
     dts = 0;

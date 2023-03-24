@@ -4,7 +4,7 @@
 #include <string>
 
 
-int DemuxPacket::readVideoFrame(ReadStream &rs) {
+int DemuxPacket::readFrame(ReadStream &rs) {
     int ret;
     sync_byte = rs.readMultiBit(8);
     transport_error_indicator = rs.readMultiBit(1);
@@ -24,7 +24,7 @@ int DemuxPacket::readVideoFrame(ReadStream &rs) {
     }
 
     if (adaptation_field_control == 1 || adaptation_field_control == 3) {
-        if (VIDEO_PID == PID) {
+        if (VIDEO_PID == PID || AUDIO_PID == PID) {
             if (payload_unit_start_indicator) {
                 ret = PES::read_PES_packet(rs);
                 if (ret < 0) {
@@ -32,9 +32,7 @@ int DemuxPacket::readVideoFrame(ReadStream &rs) {
                     return ret;
                 }
             }
-            return VIDEO_PID;
-        } else if (AUDIO_PID == PID) {
-
+            return PID;
         }
     }
     return 0;

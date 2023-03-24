@@ -2,14 +2,6 @@
 #include "readStream.h"
 
 
-
-static uint64_t av_rescale_q(uint64_t a, const AVRational &bq, const AVRational &cq) {
-    //(1 / 25) / (1 / 1000);
-    int64_t b = bq.num * cq.den;
-    int64_t c = cq.num * bq.den;
-    return a * b / c;  //25 * (1000 / 25)  把1000分成25份，然后当前占1000的多少
-}
-
 void NALReader::reset() {
     fs.seekg(0);
     fs.read(reinterpret_cast<char *>(bufferStart), MAX_BUFFER_SIZE);
@@ -42,8 +34,8 @@ int NALReader::init(const char *filename) {
     return 0;
 }
 
-int NALReader::init1(const std::string &dir, uint32_t transportStreamPacketNumber) {
-
+int NALReader::init1(const std::string &dir, uint32_t transportStreamPacketNumber, int timestamp) {
+    clockRate = timestamp;
     currentPacket = transportStreamPacketNumber;
     std::string name = "test" + std::to_string(currentPacket) + ".ts";
     fs.open("test/" + name, std::ios::out | std::ios::binary);
@@ -85,7 +77,7 @@ int NALReader::getTransportStreamData() {
             }
         }
         ReadStream rs(transportStreamBuffer, size);
-        ret = demux.readVideoFrame(rs);
+        ret = demux.readFrame(rs);
         if (ret < 0) {
             fprintf(stderr, "demux.readVideoFrame失败\n");
             return ret;
@@ -109,28 +101,28 @@ int NALReader::readNalUint1(uint8_t *&data, uint32_t &size) {
     uint8_t *pos2 = nullptr;
     int startCodeLen1 = 0;
     int startCodeLen2 = 0;
+
+    /*还剩多少字节未读取*/
+    uint32_t remainingByte = bufferEnd - bufferPosition;
+    /*这里内存重叠了，不过是正常拷贝过去的*/
+    memcpy(bufferStart, bufferPosition, remainingByte);
+    blockBufferSize = remainingByte;
+    bufferEnd = bufferStart + remainingByte;
+
     while (true) {
         ret = findNALU(pos1, pos2, startCodeLen1, startCodeLen2);
 
         /*如果没找到就要继续往buffer里面塞数据，直到找到为止*/
         if (ret == 1) { //表示找到了开头的startCode,没找到后面的
-
             ret = getTransportStreamData();
             if (ret < 0) {
+                fprintf(stderr, "获取ts video数据失败\n");
                 return ret;
             }
         } else if (ret == 2) {//都找到了
-//            data = pos1 + startCodeLen1;
-            data = pos1;
+            data = pos1 + startCodeLen1;
             size = pos2 - data;
-            /*还剩多少字节未读取*/
-            uint32_t residual = bufferEnd - pos2;
-            //   bufferPosition = pos2;// data + size;
-            /*找到了nalu，那么就把还没有读取的数据放在前面来*/
-            memcpy(bufferStart, pos2, residual);
-            blockBufferSize = residual;
-            //bufferPosition = pos2;
-            bufferEnd = bufferStart + residual;
+            bufferPosition = pos2;
             break;
         } else {
             //错误
@@ -199,13 +191,15 @@ int NALReader::readNalUint(uint8_t *&data, uint32_t &size, int &startCodeLength,
         const int type = getNextStartCode(bufferPosition, bufferEnd,
                                           pos1, pos2, startCodeLen1, startCodeLen2);
         startCodeLength = startCodeLen1;
-        /*还剩多少字节未读取*/
-        uint32_t residual = (bufferEnd - pos1 + 1);
-        /*已经读取了多少个字节*/
-        uint32_t readSize = blockBufferSize - residual;
+
         if (type == 1) { //表示找到了开头的startCode,没找到后面的
+            /*还剩多少字节未读取*/
+            uint32_t residual = (bufferEnd - pos1 + 1);
+            /*已经读取了多少个字节*/
+            uint32_t readSize = blockBufferSize - residual;
+
             memcpy(bufferStart, pos1, residual);
-            //每次读File::MAX_BUFFER_SIZE个，这里读取的NALU必须要包含一整个slice,字节对齐
+            //每次读File::MAX_BUFFER_SIZE个，这里读取的NALU必须要包含一整个slice
             //size_t bufferSize = fread(bufferStart + residual, 1, readSize, file);
             fs.read(reinterpret_cast<char *>(bufferStart + residual), readSize);
             uint32_t bufferSize = fs.gcount();
@@ -479,42 +473,51 @@ int NALReader::getVideoFrame1(NALPicture *&picture) {
 
     uint8_t *data;
     uint32_t size;
+
     ret = readNalUint1(data, size);
     if (ret < 0) {
         fprintf(stderr, "读取nalu单元错误\n");
         return ret;
     }
-    ret = test1(picture, data, size);
+
+    ret = test1(picture, data, size, 0);
     if (ret < 0) {
         fprintf(stderr, "计算picture错误\n");
         return ret;
     }
+    if (!picture->pictureFinishFlag) {
+        getVideoFrame1(picture);
+    }
+
     return 0;
 }
 
 
-int NALReader::test1(NALPicture *&picture, uint8_t *data, uint32_t size) {
+int NALReader::test1(NALPicture *&picture, uint8_t *data, uint32_t size, uint8_t startCodeLength) {
     int ret;
-    if (pictureFinishFlag) {
+
+    //   uint8_t num = flag ? 4 : 0;
+    if (picture->pictureFinishFlag) {
         picture = unoccupiedPicture;
     }
 
-    nalUnitHeader.nal_unit(data[4]);
+    nalUnitHeader.nal_unit(data[startCodeLength]);
     if (nalUnitHeader.nal_unit_type == H264_NAL_SPS) {
         /*有起始码的*/
         memcpy(spsData, data, size);
         spsSize = size;
 
 
-        size -= 4;
+        size -= startCodeLength;
         /*去除防竞争字节*/
-        NALHeader::ebsp_to_rbsp(data + 4, size);
-        ReadStream rs(data + 4, size);
+        uint8_t *ebsp = data + startCodeLength;
+        NALHeader::ebsp_to_rbsp(ebsp, size);
+        ReadStream rs(ebsp, size);
 
 
         sps.seq_parameter_set_data(rs);
         spsList[sps.seq_parameter_set_id] = sps;
-        pictureFinishFlag = false;
+        picture->pictureFinishFlag = false;
         /*picture->size += size;
         picture->data.push_back({size, data, 0});*/
     } else if (nalUnitHeader.nal_unit_type == H264_NAL_PPS) {
@@ -524,14 +527,15 @@ int NALReader::test1(NALPicture *&picture, uint8_t *data, uint32_t size) {
         memcpy(ppsData, data, size);
         ppsSize = size;
 
-        size -= 4;
-        NALHeader::ebsp_to_rbsp(data + 4, size);
-        ReadStream rs(data + 4, size);
+        size -= startCodeLength;
+        uint8_t *ebsp = data + startCodeLength;
+        NALHeader::ebsp_to_rbsp(ebsp, size);
+        ReadStream rs(ebsp, size);
 
 
         pps.pic_parameter_set_rbsp(rs, spsList);
         ppsList[pps.pic_parameter_set_id] = pps;
-        pictureFinishFlag = false;
+        picture->pictureFinishFlag = false;
         /* picture->size += size;
          picture->data.push_back({size, data, 2});*/
     } else if (nalUnitHeader.nal_unit_type == H264_NAL_SLICE) {
@@ -542,8 +546,9 @@ int NALReader::test1(NALPicture *&picture, uint8_t *data, uint32_t size) {
          * 或者一帧数据还不够30个字节，也不太可能
          * */
         uint32_t headerSize = 30;
+        /*todo 这里可以优化，放到类里面，避免多次分配释放*/
         uint8_t header[30];
-        memcpy(header, data + 4, headerSize);
+        memcpy(header, data + startCodeLength, headerSize);
         NALHeader::ebsp_to_rbsp(header, headerSize);
         ReadStream rs(header, headerSize);
 
@@ -582,13 +587,13 @@ int NALReader::test1(NALPicture *&picture, uint8_t *data, uint32_t size) {
         picture->size += size;
         picture->data.push_back({size, data, 0});
 
-        pictureFinishFlag = true;
+        picture->pictureFinishFlag = true;
     } else if (nalUnitHeader.nal_unit_type == H264_NAL_IDR_SLICE) {
 
 
         uint32_t headerSize = 30;
         uint8_t header[30];
-        memcpy(header, data + 4, headerSize);
+        memcpy(header, data + startCodeLength, headerSize);
         NALHeader::ebsp_to_rbsp(header, headerSize);
         ReadStream rs(header, headerSize);
 
@@ -636,10 +641,10 @@ int NALReader::test1(NALPicture *&picture, uint8_t *data, uint32_t size) {
 
         picture->size += size;
         picture->data.push_back({size, data, 3});
-        pictureFinishFlag = true;
+        picture->pictureFinishFlag = true;
     } else {
         fprintf(stderr, "其他type\n");
-        pictureFinishFlag = false;
+        picture->pictureFinishFlag = false;
     }
     return 0;
 }
@@ -652,11 +657,11 @@ void NALReader::computedTimestamp(NALPicture *picture) {
 
     picture->pts = av_rescale_q((videoDecodeIdrFrameNumber + picture->pictureOrderCount) / 2,
                                 picture->sliceHeader.sps.timeBase,
-                                {1, 1000});
-    picture->dts = av_rescale_q(videoDecodeFrameNumber, picture->sliceHeader.sps.timeBase, {1, 1000});
-    picture->pcr = av_rescale_q(videoDecodeFrameNumber, picture->sliceHeader.sps.timeBase, {1, 1000});
+                                {1, clockRate});
+    picture->dts = av_rescale_q(videoDecodeFrameNumber, picture->sliceHeader.sps.timeBase, {1, clockRate});
+    picture->pcr = av_rescale_q(videoDecodeFrameNumber, picture->sliceHeader.sps.timeBase, {1, clockRate});
 
-
+    picture->interval = 1000 / (int) picture->sliceHeader.sps.fps;
     picture->duration = (double) videoDecodeFrameNumber / picture->sliceHeader.sps.fps;
     ++videoDecodeFrameNumber;
 }

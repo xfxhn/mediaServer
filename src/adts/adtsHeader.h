@@ -22,6 +22,7 @@ public:
     uint32_t size{0};
     uint64_t pts{0};
     uint64_t dts{0};
+    int interval{0};
     double duration{0};
     /*fixed_header*/
     /*帧同步标识一个帧的开始，固定为0xFFF*/

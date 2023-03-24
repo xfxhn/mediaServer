@@ -48,8 +48,7 @@ private:
     uint32_t piecewise_rate{0};
     uint8_t splice_type{0};
 public:
-
-    int readVideoFrame(ReadStream &rs);
+    int readFrame(ReadStream &rs);
 
 private:
     int adaptation_field(ReadStream &rs);

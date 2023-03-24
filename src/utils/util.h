@@ -9,6 +9,13 @@
 #include <vector>
 #include <map>
 
+struct AVRational {
+    int num;
+    int den;
+};
+
+uint64_t av_rescale_q(uint64_t a, const AVRational &bq, const AVRational &cq);
+
 std::string trim(const std::string &str);
 
 int base64_encode(const std::string &text, uint8_t *encode);

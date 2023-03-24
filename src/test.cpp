@@ -10,10 +10,29 @@
 #include "NALReader.h"
 
 int main() {
-    int ret1;
+
+
+// Your function here
+
+    std::chrono::time_point<std::chrono::high_resolution_clock> end;
+    std::chrono::duration<double, std::milli> elapsed{};
+
+    auto start = std::chrono::high_resolution_clock::now();
+    /*while (true) {
+        for (int i = 0; i < 1000000; ++i) {
+            int a = 1;
+        }
+
+        elapsed = std::chrono::high_resolution_clock::now() - start;
+
+        std::cout << "Elapsed time: " << elapsed.count() << std::endl;
+        std::this_thread::sleep_for(std::chrono::milliseconds((int) 1000));
+        start = std::chrono::high_resolution_clock::now();
+    }*/
+    /*int ret1;
     NALReader reader;
     reader.init1("test/", 0);
-
+    uint64_t aaa = av_rescale_q(1, {1, 30}, {1, 1000});
     uint8_t *data;
     uint32_t size;
     while (true) {
@@ -24,7 +43,7 @@ int main() {
     }
 
 
-    return 0;
+    return 0;*/
 
 
     int ret;
