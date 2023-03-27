@@ -43,6 +43,7 @@ int AdtsReader::init1(const std::string &dir, uint32_t transportStreamPacketNumb
 
     currentPacket = transportStreamPacketNumber;
     std::string name = "test" + std::to_string(currentPacket) + ".ts";
+    printf("读取%s文件 audio init\n", name.c_str());
     fs.open("test/" + name, std::ios::out | std::ios::binary);
     if (!fs.is_open()) {
         fprintf(stderr, "open %s failed\n", name.c_str());
@@ -232,7 +233,8 @@ void AdtsReader::disposeAudio(AdtsHeader &header, uint8_t *data, uint32_t size) 
     header.duration = (double) audioDecodeFrameNumber / header.sample_rate;
     header.dts = audioDecodeFrameNumber;
     header.pts = av_rescale_q(audioDecodeFrameNumber, {1, static_cast<int>(header.sample_rate)}, {1, 1000});
-    header.interval = (int) (1024.0 / (double) header.sample_rate * 1000.0);
+    /*转换成微秒*/
+    header.interval = (int) (1024.0 / (double) header.sample_rate * 1000000.0);
     audioDecodeFrameNumber += 1024;
 }
 
@@ -248,6 +250,7 @@ int AdtsReader::getTransportStreamData() {
             /*这里ts文件，应该就是188的倍数，不是188的倍数，这个文件是有问题*/
             fs.close();
             std::string name = "test" + std::to_string(++currentPacket) + ".ts";
+            printf("读取%s文件 audio\n", name.c_str());
             fs.open("test/" + name, std::ios::out | std::ios::binary);
             if (!fs.is_open()) {
                 fprintf(stderr, "open %s failed\n", name.c_str());

@@ -5,7 +5,7 @@
 #include "util.h"
 #include "parseUrl.h"
 
-
+#include "rtspReceiveData.h"
 #include "readStream.h"
 #include "writeStream.h"
 
@@ -14,7 +14,7 @@
 #define RTP_PAYLOAD_TYPE_AAC    97
 
 
-struct {
+static struct {
     std::string version;
     std::map<std::string, std::string> origin;
     std::string name;
@@ -98,7 +98,7 @@ int Rtsp::parseRtsp(std::string &packet, const std::string &data) {
 
     list.erase(list.begin());
 
-    std::map<std::string, std::string> obj = getRtspObj(list, ":");
+    std::map<std::string, std::string> obj = getObj(list, ":");
 
     if (strcmp(method, "OPTIONS") == 0) {
         /*回复客户端当前可用的方法*/
@@ -376,11 +376,14 @@ indexdeltalength=3：表示音频的访问单元索引差值（AU-Index-delta）
         /*这里接收客户端传过来的音视频数据，组帧*/
         /* todo 这里可以尝试开辟一下子线程去接收数据 */
         /* todo 还有就是如果有多个人推流的时候也要处理 */
-        ret = receiveData(packet);
+
+
+        receiveThread = new std::thread(&Rtsp::receiveData, this, packet);
+        /*ret = receiveData(packet);
         if (ret < 0) {
             fprintf(stderr, "receiveData 失败\n");
             return ret;
-        }
+        }*/
 
     } else if (strcmp(method, "PLAY") == 0) { //向服务端发起播放请求
         sprintf(responseBuffer,
@@ -397,8 +400,13 @@ indexdeltalength=3：表示音频的访问单元索引差值（AU-Index-delta）
             fprintf(stderr, "发送数据失败 -> option\n");
             return ret;
         }
-        videoThread = new std::thread(&Rtsp::sendVideo, this, transportStreamPacketNumber);
-        audioThread = new std::thread(&Rtsp::sendAudio, this, transportStreamPacketNumber);
+
+        if (transportStreamPacketNumber - 2 < 0) {
+            fprintf(stderr, "还没准备好，等一会儿在拉流\n");
+            return -1;
+        }
+        videoSendThread = new std::thread(&Rtsp::sendVideo, this, transportStreamPacketNumber - 2);
+        audioSendThread = new std::thread(&Rtsp::sendAudio, this, transportStreamPacketNumber - 2);
 
     } else if (strcmp(method, "TEARDOWN") == 0) {
         //结束会话请求，该请求会停止所有媒体流，并释放服务器上的相关会话数据。
@@ -422,8 +430,10 @@ indexdeltalength=3：表示音频的访问单元索引差值（AU-Index-delta）
 
         stopFlag = false;
     } else if (strcmp(method, "GET_PARAMETER") == 0) {
-        //结束会话请求，该请求会停止所有媒体流，并释放服务器上的相关会话数据。
-        /*这里推流端和拉流端都会发送这个请求，要各自释放各自的资源*/
+        printf("method = %s\n", method);
+        printf("url = %s\n", url);
+        /*保持连接用的*/
+        /*在暂停流媒体播放，定期发送GET_PARAMETER作为心跳包维持连接*/
         sprintf(responseBuffer,
                 "RTSP/1.0 200 OK\r\n"
                 "CSeq: %s\r\n"
@@ -452,6 +462,9 @@ int Rtsp::receiveData(std::string &packet) {
 
 
     int ret;
+
+    RtspReceiveData receive;
+    TransportPacket ts;
     /*接收rtsp数据，存为ts*/
     ts.init("test/");
 
@@ -499,7 +512,7 @@ int Rtsp::receiveData(std::string &packet) {
                 rtpBufferSize += size;
             } else {
                 /*处理数据*/
-                ret = disposeRtpData(rtpBuffer, rtpBufferSize, channel, length);
+                ret = disposeRtpData(ts, rtpBuffer, rtpBufferSize, channel, length);
                 if (ret < 0) {
                     fprintf(stderr, "处理rtp包失败\n");
                     return ret;
@@ -519,7 +532,8 @@ int Rtsp::receiveData(std::string &packet) {
 
 static constexpr uint8_t startCode[4] = {0, 0, 0, 1};
 
-int Rtsp::disposeRtpData(uint8_t *rtpBuffer, uint32_t rtpBufferSize, uint8_t channel, uint16_t length) {
+int Rtsp::disposeRtpData(TransportPacket &ts, uint8_t *rtpBuffer, uint32_t rtpBufferSize, uint8_t channel,
+                         uint16_t length) {
     int ret;
     if (channel == videoChannel) {
         ReadStream rs(rtpBuffer, rtpBufferSize);
@@ -603,7 +617,6 @@ int Rtsp::disposeRtpData(uint8_t *rtpBuffer, uint32_t rtpBufferSize, uint8_t cha
 
 
             if (frame->pictureFinishFlag) {
-                //printf("video duration = %f,idr = %d\n", frame->duration, frame->sliceHeader.nalu.IdrPicFlag);
                 ret = ts.writeTransportStream(frame, transportStreamPacketNumber);
                 if (ret < 0) {
                     fprintf(stderr, "ts.writeVideo 失败\n");
@@ -656,13 +669,9 @@ int Rtsp::disposeRtpData(uint8_t *rtpBuffer, uint32_t rtpBufferSize, uint8_t cha
 int Rtsp::sendVideo(uint32_t number) {
     int ret;
 
-    if (number <= 0) {
-        fprintf(stderr, "现在还拉不了rtsp流，等一会儿\n");
-        return -1;
-    }
 
     NALReader reader;
-    ret = reader.init1(dir, number - 1, 90000);
+    ret = reader.init1(dir, number, 90000);
     if (ret < 0) {
         fprintf(stderr, "reader.init1失败\n");
         return ret;
@@ -680,7 +689,7 @@ int Rtsp::sendVideo(uint32_t number) {
     //   std::chrono::time_point<std::chrono::high_resolution_clock> start = std::chrono::high_resolution_clock::now();
 
     std::chrono::time_point<std::chrono::high_resolution_clock> currentTime;
-    std::chrono::duration<double, std::milli> elapsed{};
+    std::chrono::duration<int, std::micro> elapsed{};
     /* clock_t currentTime;
      clock_t lastTime = clock();*/
     auto lastTime = std::chrono::high_resolution_clock::now();
@@ -689,9 +698,6 @@ int Rtsp::sendVideo(uint32_t number) {
     /*这里如果父线程退出的话，这里自然会退出，但是如果是子线程出错，想要退出并且关闭这个tcp链接*/
     while (stopVideoSendFlag) {
         ret = reader.getVideoFrame1(picture);
-        /*if (!picture->pictureFinishFlag) {
-            continue;
-        }*/
 
         if (ret < 0) {
             fprintf(stderr, "获取视频数据失败\n");
@@ -714,16 +720,11 @@ int Rtsp::sendVideo(uint32_t number) {
         }
 
         videoPacket.timestamp = picture->dts;
-        /*如果上面程序用了10毫秒，那么每帧间隔时间，33.33 - 10 = 23.333*/
-        //currentTime = clock();
-        elapsed = std::chrono::high_resolution_clock::now() - lastTime;
-        //double aaaa = picture->interval - elapsed.count();
-        // lastTime = (picture->interval - ((currentTime - lastTime) / CLOCKS_PER_SEC * 1000));
-        // printf("运行%f毫秒\n", elapsed.count());
-        // printf("间隔%f毫秒\n", aaaa);
-        /*   printf("间隔%ld毫秒\n", lastTime);
-           printf("interval = %d毫秒\n", picture->interval);*/
-        std::this_thread::sleep_for(std::chrono::milliseconds(picture->interval - (int) elapsed.count()));
+
+        elapsed = std::chrono::duration_cast<std::chrono::microseconds>(
+                std::chrono::high_resolution_clock::now() - lastTime);
+
+        std::this_thread::sleep_for(std::chrono::microseconds(picture->interval - elapsed.count() - 9000));
 
         lastTime = std::chrono::high_resolution_clock::now();
     }
@@ -775,15 +776,10 @@ int Rtsp::sendVideo(uint32_t number) {
 int Rtsp::sendAudio(uint32_t number) {
     int ret;
 
-    if (number <= 0) {
-        fprintf(stderr, "现在还拉不了rtsp流，等一会儿\n");
-        return -1;
-    }
-
 
     AdtsReader reader;
 
-    ret = reader.init1(dir, number - 1);
+    ret = reader.init1(dir, number);
     if (ret < 0) {
         fprintf(stderr, "reader.init1失败\n");
         return ret;
@@ -791,30 +787,34 @@ int Rtsp::sendAudio(uint32_t number) {
     AdtsHeader header;
     RtpPacket audioPacket;
     audioPacket.init(AdtsReader::MAX_BUFFER_SIZE, RTP_PAYLOAD_TYPE_AAC);
-    clock_t lastTime = clock();
-    clock_t currentTime;
+
+    //auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+    std::chrono::time_point<std::chrono::high_resolution_clock> currentTime;
+    std::chrono::duration<int, std::micro> elapsed{};
+    auto lastTime = std::chrono::high_resolution_clock::now();
+
     while (stopAudioSendFlag) {
+        /*这里是获取一帧音频数据*/
         ret = reader.getAudioFrame1(header);
         if (ret < 0) {
             fprintf(stderr, "获取audio frame失败\n");
             return ret;
         }
+        /*这里是把音频数据发出去*/
         ret = audioPacket.sendAudioPacket(clientSocket, header.data, header.size, audioChannel);
         if (ret < 0) {
             fprintf(stderr, "发送音频包失败\n");
             //  audioSendError = true;
             return ret;
         }
-
         audioPacket.timestamp = header.dts;
+        /*当前时间减去上个时间*/
+        elapsed = std::chrono::duration_cast<std::chrono::microseconds>(
+                std::chrono::high_resolution_clock::now() - lastTime);
 
-        currentTime = clock();
-        lastTime = (header.interval - ((currentTime - lastTime) / CLOCKS_PER_SEC * 1000));
-        // printf("运行%d毫秒,间隔%d毫秒\n", ((currentTime - lastTime) / CLOCKS_PER_SEC * 1000), lastTime);
-        std::this_thread::sleep_for(std::chrono::milliseconds(lastTime));
-
-
-        lastTime = clock();;
+        std::this_thread::sleep_for(std::chrono::microseconds(header.interval - elapsed.count() - 8100));
+        /*记录下上一帧发送完的时间*/
+        lastTime = std::chrono::high_resolution_clock::now();
     }
     return 0;
     /* int ret;
@@ -934,7 +934,7 @@ int Rtsp::parseMediaLevel(int i, const std::vector<std::string> &list) {
                         } else if (left == "fmtp:96") {
                             sdpInfo.media[num]["fmtp"] = right;
                             // fmtp:96 packetization-mode=1; sprop-parameter-sets=Z2QAH6zZQFAFuhAAAAMAEAAAAwPA8YMZYA==,aOvjyyLA; profile-level-id=64001F
-                            std::map<std::string, std::string> obj = getRtspObj(split(right, ";"), "=");
+                            std::map<std::string, std::string> obj = getObj(split(right, ";"), "=");
                             std::vector<std::string> sps_pps = split(obj["sprop-parameter-sets"], ",");
 
                             uint8_t sps[50];
@@ -973,7 +973,7 @@ int Rtsp::parseMediaLevel(int i, const std::vector<std::string> &list) {
                             sdpInfo.media[num]["rtpmap"] = right;
                         } else if (left == "fmtp:97") {
                             //                            fmtp:97 profile-level-id=1;mode=AAC-hbr;sizelength=13;indexlength=3;indexdeltalength=3; config=119056E500
-                            std::map<std::string, std::string> obj = getRtspObj(split(right, ";"), "=");
+                            std::map<std::string, std::string> obj = getObj(split(right, ";"), "=");
                             sdpInfo.media[num]["fmtp"] = right;
                             ret = parseAACConfig(obj["config"]);
                             if (ret < 0) {
@@ -994,20 +994,6 @@ int Rtsp::parseMediaLevel(int i, const std::vector<std::string> &list) {
         }
     }
     return 0;
-}
-
-std::map<std::string, std::string> Rtsp::getRtspObj(const std::vector<std::string> &list, const std::string &spacer) {
-    std::map<std::string, std::string> obj;
-    for (const std::string &str: list) {
-        std::string::size_type pos = str.find(spacer);
-        if (pos != std::string::npos) {
-            std::string key = trim(str.substr(0, pos));
-            std::string value = trim(str.substr(pos + 1));
-            obj[key] = value;
-        }
-    }
-
-    return obj;
 }
 
 
@@ -1089,14 +1075,14 @@ Rtsp::~Rtsp() {
     printf("~Rtsp 析构\n");
     stopVideoSendFlag = false;
     stopAudioSendFlag = false;
-    if (videoThread && videoThread->joinable()) {
-        videoThread->join();
-        delete videoThread;
+    if (videoSendThread && videoSendThread->joinable()) {
+        videoSendThread->join();
+        delete videoSendThread;
     }
 
-    if (audioThread && audioThread->joinable()) {
-        audioThread->join();
-        delete audioThread;
+    if (audioSendThread && audioSendThread->joinable()) {
+        audioSendThread->join();
+        delete audioSendThread;
     }
 }
 

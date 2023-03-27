@@ -14,6 +14,8 @@ struct AVRational {
     int den;
 };
 
+std::map<std::string, std::string> getObj(const std::vector<std::string> &list, const std::string &spacer);
+
 uint64_t av_rescale_q(uint64_t a, const AVRational &bq, const AVRational &cq);
 
 std::string trim(const std::string &str);
@@ -34,6 +36,5 @@ std::string decimalToHex(int decimalNum);
 
 std::vector<std::string> split(const std::string &str, const std::string &spacer);
 
-/*std::map<std::string, std::string> getSdpMap(const std::list<std::string> &list, const std::string &spacer);*/
 
 #endif //RTSP_UTIL_H

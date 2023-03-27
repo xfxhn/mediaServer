@@ -223,23 +223,25 @@ std::vector<std::string> split(const std::string &str, const std::string &spacer
         list.push_back(str.substr(pos1));
     return list;
 }
+
 uint64_t av_rescale_q(uint64_t a, const AVRational &bq, const AVRational &cq) {
     //(1 / 25) / (1 / 1000);
     int64_t b = bq.num * cq.den;
     int64_t c = cq.num * bq.den;
     return a * b / c;  //25 * (1000 / 25)  把1000分成25份，然后当前占1000的多少
 }
-/*
-std::map<std::string, std::string> getSdpMap(const std::list<std::string> &list, const std::string &spacer) {
+
+
+std::map<std::string, std::string> getObj(const std::vector<std::string> &list, const std::string &spacer) {
     std::map<std::string, std::string> obj;
     for (const std::string &str: list) {
         std::string::size_type pos = str.find(spacer);
         if (pos != std::string::npos) {
-            std::string key = str.substr(0, pos);
-            std::string value = str.substr(pos + 1, str.length() - 2);
+            std::string key = trim(str.substr(0, pos));
+            std::string value = trim(str.substr(pos + 1));
             obj[key] = value;
         }
     }
 
     return obj;
-}*/
+}

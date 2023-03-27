@@ -23,7 +23,7 @@ class Rtsp {
 private:
 //    std::ofstream fs;
 //    NALDecodedPictureBuffer gop;
-    TransportPacket ts;
+
     AdtsHeader adtsHeader;
     NALPicture *frame{nullptr};
     NALReader nalReader;
@@ -64,11 +64,11 @@ private:
     uint32_t ssrc{0};
 
 
-   
     SOCKET clientSocket;
 
-    std::thread *videoThread{nullptr};
-    std::thread *audioThread{nullptr};
+    std::thread *videoSendThread{nullptr};
+    std::thread *audioSendThread{nullptr};
+    std::thread *receiveThread{nullptr};
 
     uint8_t videoChannel{0};
     uint8_t audioChannel{0};
@@ -92,8 +92,8 @@ private:
 public:
     bool stopFlag{true};
 
-   /* bool videoSendError{false};
-    bool audioSendError{false};*/
+    /* bool videoSendError{false};
+     bool audioSendError{false};*/
 
     std::string aacConfig;
     std::string sprop_parameter_sets;
@@ -109,7 +109,7 @@ public:
 private:
     bool stopVideoSendFlag{true};
     bool stopAudioSendFlag{true};
-    
+
     std::string dir{"test/"};
 
     /*
@@ -134,10 +134,8 @@ private:
 
     int parseMediaLevel(int i, const std::vector<std::string> &list);
 
-    int disposeRtpData(uint8_t *rtpBuffer, uint32_t rtpBufferSize, uint8_t channel, uint16_t length);
-
-    static std::map<std::string, std::string>
-    getRtspObj(const std::vector<std::string> &list, const std::string &spacer);
+    int
+    disposeRtpData(TransportPacket &ts, uint8_t *rtpBuffer, uint32_t rtpBufferSize, uint8_t channel, uint16_t length);
 
     /*int muxTransportStream(uint8_t channel, uint8_t *data, uint32_t size);*/
 

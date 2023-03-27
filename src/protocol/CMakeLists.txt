@@ -1,7 +1,7 @@
 ﻿
 
 
-add_library(protocol rtsp.cpp rtpPacket.cpp)
+add_library(protocol rtsp.cpp rtpPacket.cpp rtspReceiveData.cpp)
 
 target_include_directories(protocol
         PUBLIC ${PROJECT_SOURCE_DIR}/src/nalu

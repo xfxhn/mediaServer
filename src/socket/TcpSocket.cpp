@@ -153,6 +153,8 @@ int TcpSocket::receive(SOCKET clientSocket, char *data, int &dataSize) {
 }*/
 
 int TcpSocket::sendData(SOCKET clientSocket, uint8_t *buffer, int length) {
+
+
     int ret = send(clientSocket, reinterpret_cast<const char *>(buffer), length, 0);
     if (ret < 0) {
         fprintf(stderr, "发送失败\n");

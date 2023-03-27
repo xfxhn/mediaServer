@@ -38,6 +38,7 @@ int NALReader::init1(const std::string &dir, uint32_t transportStreamPacketNumbe
     clockRate = timestamp;
     currentPacket = transportStreamPacketNumber;
     std::string name = "test" + std::to_string(currentPacket) + ".ts";
+    printf("读取%s文件 video init\n", name.c_str());
     fs.open("test/" + name, std::ios::out | std::ios::binary);
     if (!fs.is_open()) {
         fprintf(stderr, "open %s failed\n", name.c_str());
@@ -63,6 +64,7 @@ int NALReader::getTransportStreamData() {
             /*这里ts文件，应该就是188的倍数，不是188的倍数，这个文件是有问题*/
             fs.close();
             std::string name = "test" + std::to_string(++currentPacket) + ".ts";
+            printf("读取%s文件 video\n", name.c_str());
             fs.open("test/" + name, std::ios::out | std::ios::binary);
             if (!fs.is_open()) {
                 fprintf(stderr, "open %s failed\n", name.c_str());
@@ -486,11 +488,12 @@ int NALReader::getVideoFrame1(NALPicture *&picture) {
         return ret;
     }
     if (!picture->pictureFinishFlag) {
-        getVideoFrame1(picture);
+        this->getVideoFrame1(picture);
     }
 
     return 0;
 }
+
 
 
 int NALReader::test1(NALPicture *&picture, uint8_t *data, uint32_t size, uint8_t startCodeLength) {
@@ -660,8 +663,8 @@ void NALReader::computedTimestamp(NALPicture *picture) {
                                 {1, clockRate});
     picture->dts = av_rescale_q(videoDecodeFrameNumber, picture->sliceHeader.sps.timeBase, {1, clockRate});
     picture->pcr = av_rescale_q(videoDecodeFrameNumber, picture->sliceHeader.sps.timeBase, {1, clockRate});
-
-    picture->interval = 1000 / (int) picture->sliceHeader.sps.fps;
+    /*转换成微秒*/
+    picture->interval = 1000000 / (int) picture->sliceHeader.sps.fps;
     picture->duration = (double) videoDecodeFrameNumber / picture->sliceHeader.sps.fps;
     ++videoDecodeFrameNumber;
 }
