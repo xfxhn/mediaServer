@@ -245,3 +245,8 @@ std::map<std::string, std::string> getObj(const std::vector<std::string> &list, 
 
     return obj;
 }
+
+std::string generate_unique_string() {
+    static int counter = 0;
+    return "xiaofeng_" + std::to_string(counter++);
+}

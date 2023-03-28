@@ -36,5 +36,6 @@ std::string decimalToHex(int decimalNum);
 
 std::vector<std::string> split(const std::string &str, const std::string &spacer);
 
+std::string generate_unique_string();
 
 #endif //RTSP_UTIL_H

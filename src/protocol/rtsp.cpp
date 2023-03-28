@@ -14,13 +14,7 @@
 #define RTP_PAYLOAD_TYPE_AAC    97
 
 
-static struct {
-    std::string version;
-    std::map<std::string, std::string> origin;
-    std::string name;
-    std::map<std::string, std::string> timing;
-    std::map<std::string, std::string> media[2];
-} sdpInfo;
+static std::map<std::string, Info> flowInfo;
 /*当前写到第几个ts包了*/
 uint32_t transportStreamPacketNumber{0};
 enum {
@@ -249,18 +243,28 @@ indexdeltalength=3：表示音频的访问单元索引差值（AU-Index-delta）
                     std::string sdp = packet.substr(0, size);
                     packet.erase(0, size);
 
-                    ret = parseSdp(sdp);
+
+                    std::string uniqueString = generate_unique_string();
+
+                    Info info;
+                    info.session = uniqueString;
+                    info.dir = urlUtils.getPath();
+                    ret = parseSdp(sdp, info.sdp);
                     if (ret < 0) {
                         return 0;
                     }
+                    flowInfo[uniqueString] = info;
+
                     sprintf(responseBuffer,
                             "RTSP/1.0 200 OK\r\n"
                             "CSeq: %s\r\n"
                             "Date: %s\r\n"
                             "Server: XiaoFeng\r\n"
+                            "Session: %s\r\n"
                             "\r\n",
                             obj["CSeq"].c_str(),
-                            generatorDate().c_str()
+                            generatorDate().c_str(),
+                            uniqueString.c_str()
                     );
                     ret = TcpSocket::sendData(clientSocket, reinterpret_cast<uint8_t *>(responseBuffer),
                                               static_cast<int>(strlen(responseBuffer)));
@@ -310,7 +314,7 @@ indexdeltalength=3：表示音频的访问单元索引差值（AU-Index-delta）
         }
 
         // 截取第三个斜杠后面的子串，就是路径部分
-        std::string path = urlUtils.getPath();//rtspUrl.substr(third_slash);
+        std::string path = urlUtils.getPath();
 
         uint8_t rtpChannel = 0;
         uint8_t rtcpChannel = 0;
@@ -323,14 +327,22 @@ indexdeltalength=3：表示音频的访问单元索引差值（AU-Index-delta）
 
         std::vector<std::string> pathList = split(path, "/");
 
+        /*如果是推流，rtpChannel 表示推流上来的数据是音频还是视频，推流就用ANNOUNCE请求里的control字段来判断当前SETUP请求里rtpChannel是音频还是视频*/
+        /*如果是拉流，rtpChannel 表示拉流的数据是音频还是视频，拉流就用我发送给客户端的DESCRIBE请求里的control字段来判断当前SETUP请求里rtpChannel是音频还是视频*/
 
-        for (std::map<std::string, std::string> &map: sdpInfo.media) {
-            if (map["type"] == "video" && pathList.back() == map["control"]) {
-                videoChannel = rtpChannel;
-            } else if (map["type"] == "audio" && pathList.back() == map["control"]) {
-                audioChannel = rtpChannel;
+        if (obj.find("Session") != obj.end() && flowInfo.find(obj["Session"]) != flowInfo.end()) {
+            SdpInfo &sdpInfo = flowInfo[obj["Session"]].sdp;
+            for (std::map<std::string, std::string> &aaa: sdpInfo.media) {
+                if (aaa["type"] == "video" && pathList.back() == aaa["control"]) {
+                    videoChannel = rtpChannel;
+                } else if (aaa["type"] == "audio" && pathList.back() == aaa["control"]) {
+                    audioChannel = rtpChannel;
+                }
+
             }
-
+        } else {
+            fprintf(stderr, "没找到Session\n");
+            return -1;
         }
 
 
@@ -340,11 +352,12 @@ indexdeltalength=3：表示音频的访问单元索引差值（AU-Index-delta）
                 "Date: %s\r\n"
                 "Server: XiaoFeng\r\n"
                 "Transport: %s;%s;%s\r\n"
-                "Session: 66334873\r\n"
+                "Session: %s\r\n"
                 "\r\n",
                 obj["CSeq"].c_str(),
                 generatorDate().c_str(),
-                protocol, type, interleaved
+                protocol, type, interleaved,
+                obj["Session"].c_str()
         );
         ret = TcpSocket::sendData(clientSocket, reinterpret_cast<uint8_t *>(responseBuffer),
                                   static_cast<int>(strlen(responseBuffer)));
@@ -360,10 +373,11 @@ indexdeltalength=3：表示音频的访问单元索引差值（AU-Index-delta）
                 "CSeq: %s\r\n"
                 "Date: %s\r\n"
                 "Server: XiaoFeng\r\n"
-                "Session: 66334873\r\n"
+                "Session: %s\r\n"
                 "\r\n",
                 obj["CSeq"].c_str(),
-                generatorDate().c_str()
+                generatorDate().c_str(),
+                obj["Session"].c_str()
         );
 
         ret = TcpSocket::sendData(clientSocket, reinterpret_cast<uint8_t *>(responseBuffer),
@@ -705,6 +719,7 @@ int Rtsp::sendVideo(uint32_t number) {
             stopFlag = false;
             return ret;
         }
+        videoPacket.timestamp = picture->dts;
         for (int i = 0; i < picture->data.size(); ++i) {
             const Frame &nalUint = picture->data[i];
 
@@ -719,7 +734,6 @@ int Rtsp::sendVideo(uint32_t number) {
 
         }
 
-        videoPacket.timestamp = picture->dts;
 
         elapsed = std::chrono::duration_cast<std::chrono::microseconds>(
                 std::chrono::high_resolution_clock::now() - lastTime);
@@ -800,6 +814,7 @@ int Rtsp::sendAudio(uint32_t number) {
             fprintf(stderr, "获取audio frame失败\n");
             return ret;
         }
+        audioPacket.timestamp = header.dts;
         /*这里是把音频数据发出去*/
         ret = audioPacket.sendAudioPacket(clientSocket, header.data, header.size, audioChannel);
         if (ret < 0) {
@@ -807,7 +822,7 @@ int Rtsp::sendAudio(uint32_t number) {
             //  audioSendError = true;
             return ret;
         }
-        audioPacket.timestamp = header.dts;
+
         /*当前时间减去上个时间*/
         elapsed = std::chrono::duration_cast<std::chrono::microseconds>(
                 std::chrono::high_resolution_clock::now() - lastTime);
@@ -857,7 +872,7 @@ int Rtsp::sendAudio(uint32_t number) {
      return 0;*/
 }
 
-int Rtsp::parseSdp(const std::string &sdp) {
+int Rtsp::parseSdp(const std::string &sdp, SdpInfo sdpInfo) {
     int ret;
     std::vector<std::string> list = split(sdp, "\r\n");
 
@@ -904,7 +919,7 @@ int Rtsp::parseSdp(const std::string &sdp) {
 }
 
 
-int Rtsp::parseMediaLevel(int i, const std::vector<std::string> &list) {
+int Rtsp::parseMediaLevel(int i, const std::vector<std::string> &list, SdpInfo sdpInfo) {
     int ret;
     int num = -1;
     for (int j = i; j < list.size(); ++j) {
@@ -937,7 +952,8 @@ int Rtsp::parseMediaLevel(int i, const std::vector<std::string> &list) {
                             std::map<std::string, std::string> obj = getObj(split(right, ";"), "=");
                             std::vector<std::string> sps_pps = split(obj["sprop-parameter-sets"], ",");
 
-                            uint8_t sps[50];
+                            // uint8_t sps[50];
+                            /* todo 等会儿删除 */
                             memcpy(sps, startCode, 4);
                             ret = base64_decode(sps_pps[0], sps + 4);
                             if (ret < 0) {
@@ -951,7 +967,7 @@ int Rtsp::parseMediaLevel(int i, const std::vector<std::string> &list) {
                                 return -1;
                             }
 
-                            uint8_t pps[50];
+                            // uint8_t pps[50];
                             memcpy(pps, startCode, 4);
                             ret = base64_decode(sps_pps[1], pps + 4);
                             if (ret < 0) {

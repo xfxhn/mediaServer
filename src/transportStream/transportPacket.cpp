@@ -90,8 +90,6 @@ int TransportPacket::writeTransportStream(const NALPicture *picture, uint32_t &t
                     info1.duration,
                     info1.name.c_str()
             );
-            //printf("------------\n");
-            //printf("可以开始拉流！！！！！\n");
             m3u8FileSystem.write(m3u8Buffer, (int) strlen(m3u8Buffer));
         }
 

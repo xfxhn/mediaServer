@@ -17,6 +17,23 @@
 #include "NALPicture.h"
 #include "transportPacket.h"
 
+struct SdpInfo {
+    std::string version;
+    std::map<std::string, std::string> origin;
+    std::string name;
+    std::map<std::string, std::string> timing;
+    std::map<std::string, std::string> media[2];
+};
+
+
+struct Info {
+    std::string session;
+    std::string dir;
+    SdpInfo sdp;
+    /*这个流写入到第几个ts包*/
+    uint32_t transportStreamPacketNumber{0};
+};
+
 class ReadStream;
 
 class Rtsp {
@@ -107,6 +124,12 @@ public:
     ~Rtsp();
 
 private:
+    /*sps数据，带start code*/
+    uint8_t sps[50];
+    /*pps数据，带start code*/
+    uint8_t pps[50];
+
+
     bool stopVideoSendFlag{true};
     bool stopAudioSendFlag{true};
 
@@ -130,9 +153,9 @@ private:
 
     int sendAudio(uint32_t number);
 
-    int parseSdp(const std::string &sdp);
+    int parseSdp(const std::string &sdp, SdpInfo sdpInfo);
 
-    int parseMediaLevel(int i, const std::vector<std::string> &list);
+    int parseMediaLevel(int i, const std::vector<std::string> &list, SdpInfo sdpInfo);
 
     int
     disposeRtpData(TransportPacket &ts, uint8_t *rtpBuffer, uint32_t rtpBufferSize, uint8_t channel, uint16_t length);
