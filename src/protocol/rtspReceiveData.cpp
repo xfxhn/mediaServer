@@ -1,6 +1,8 @@
 ﻿
 #include "rtspReceiveData.h"
 
+#include <utility>
+
 enum {
     /*多个nalu在一个rtp包*/
     STAP_A = 24,
@@ -17,32 +19,45 @@ enum {
 };
 static constexpr uint8_t startCode[4] = {0, 0, 0, 1};
 
-int RtspReceiveData::init(SOCKET socket, uint8_t video, uint8_t audio) {
+RtspReceiveData::RtspReceiveData(uint32_t &transportStreamPacketNumber) : packetNumber(transportStreamPacketNumber) {
+
+}
+
+int RtspReceiveData::init(SOCKET socket, const std::string &path, uint8_t video, uint8_t audio) {
+    int ret;
+    ret = ts.init(path);
+    if (ret < 0) {
+        fprintf(stderr, "init ts失败\n");
+        return ret;
+    }
+    picture = videoReader.allocPicture();
+    if (picture == nullptr) {
+        fprintf(stderr, "获取frame失败\n");
+        return -1;
+    }
+
     videoChannel = video;
     audioChannel = audio;
     clientSocket = socket;
     /*一个rtp包最大大小不会超过16个bit也就是65535*/
     buffer = new uint8_t[65535];
     nalUintData = new uint8_t[NALReader::MAX_BUFFER_SIZE];
-    picture = videoReader.allocPicture();
-    if (picture == nullptr) {
-        fprintf(stderr, "获取frame失败\n");
-        return -1;
-    }
+
     return 0;
 }
 
 RtspReceiveData::~RtspReceiveData() {
     delete[] buffer;
+    delete[] nalUintData;
 }
 
 int RtspReceiveData::receiveData(const std::string &packet) {
     int ret;
-    ret = ts.init("test/");
-    if (ret < 0) {
-        fprintf(stderr, "init ts失败\n");
-        return ret;
+    if (buffer == nullptr) {
+        fprintf(stderr, "请初始化\n");
+        return -1;
     }
+
     memcpy(buffer, packet.c_str(), packet.length());
     uint32_t bufferSize = packet.length();
 
@@ -100,7 +115,6 @@ int RtspReceiveData::receiveData(const std::string &packet) {
     return 0;
 }
 
-static uint32_t transportStreamPacketNumber;
 
 int RtspReceiveData::disposeRtpData(uint8_t *rtpBuffer, uint32_t rtpBufferSize, uint8_t channel, uint16_t length) {
     int ret;
@@ -160,7 +174,7 @@ int RtspReceiveData::disposeRtpData(uint8_t *rtpBuffer, uint32_t rtpBufferSize, 
                 }
                 if (picture->pictureFinishFlag) {
                     /*获取到完整的一帧,做对应操作*/
-                    ret = ts.writeTransportStream(picture, transportStreamPacketNumber);
+                    ret = ts.writeTransportStream(picture, packetNumber);
                     if (ret < 0) {
                         fprintf(stderr, "ts.writeVideo 失败\n");
                         return -1;
@@ -186,7 +200,7 @@ int RtspReceiveData::disposeRtpData(uint8_t *rtpBuffer, uint32_t rtpBufferSize, 
 
 
             if (picture->pictureFinishFlag) {
-                ret = ts.writeTransportStream(picture, transportStreamPacketNumber);
+                ret = ts.writeTransportStream(picture, packetNumber);
                 if (ret < 0) {
                     fprintf(stderr, "ts.writeVideo 失败\n");
                     return -1;
@@ -225,7 +239,6 @@ int RtspReceiveData::disposeRtpData(uint8_t *rtpBuffer, uint32_t rtpBufferSize, 
             rs.setBytePtr(aacSize);
         }
 
-
     } else {
         printf("rtcp channel = %d\n", channel);
     }
@@ -249,3 +262,17 @@ int RtspReceiveData::getRtpHeader(ReadStream &rs) {
     ssrc = rs.readMultiBit(32);
     return 0;
 }
+
+int RtspReceiveData::writeVideoData(uint8_t *data, uint8_t size) {
+    return videoReader.test1(picture, data, size, 4);
+}
+
+int
+RtspReceiveData::writeAudioData(uint8_t audioObjectType, uint8_t samplingFrequencyIndex, uint8_t channelConfiguration) {
+    WriteStream ws(AdtsHeader::header, 7);
+    adtsHeader.setConfig(audioObjectType - 1, samplingFrequencyIndex, channelConfiguration, 0);
+    adtsHeader.writeAdtsHeader(ws);
+    return 0;
+}
+
+

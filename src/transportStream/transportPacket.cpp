@@ -4,6 +4,8 @@
 #include <cstdio>
 #include <string>
 #include <cstring>
+#include <utility>
+#include <filesystem>
 #include "NALPicture.h"
 #include "adtsHeader.h"
 
@@ -23,16 +25,22 @@ enum {
 
 static uint8_t fillByte = 0xFF;
 
-int TransportPacket::init(const char *path) {
+int TransportPacket::init(std::string path) {
 
-    dir = path;
+    dir = std::move(path);
+
+    /*返回true表示创建成功，返回false表示已经存在*/
+    std::filesystem::create_directories(dir);
+
+
+
     buffer = new uint8_t[TRANSPORT_STREAM_PACKETS_SIZE];
     ws = new WriteStream(buffer, TRANSPORT_STREAM_PACKETS_SIZE);
 
 
-    m3u8FileSystem.open(dir + "test.m3u8", std::ios::binary | std::ios::out | std::ios::trunc);
+    m3u8FileSystem.open(dir + "/test.m3u8", std::ios::binary | std::ios::out | std::ios::trunc);
     if (!m3u8FileSystem.is_open()) {
-        fprintf(stderr, "cloud not open %s\n", (dir + "test.m3u8").c_str());
+        fprintf(stderr, "cloud not open %s\n", (dir + "/test.m3u8").c_str());
         return -1;
     }
     return 0;
@@ -46,15 +54,14 @@ int TransportPacket::writeTransportStream(const NALPicture *picture, uint32_t &t
         audioPacketSize = 0;
         transportStreamFileSystem.close();
 
-        std::string name = "test" + std::to_string(transportStreamPacketNumber++) + ".ts";
+        std::string name = "/test" + std::to_string(transportStreamPacketNumber++) + ".ts";
         printf("写入%s文件\n", name.c_str());
         /*当前的时间减去上个切片的时间*/
         double duration = picture->duration - lastDuration;
         list.push_back({name, duration});
         transportStreamFileSystem.open(dir + name, std::ios::binary | std::ios::out | std::ios::trunc);
         if (!transportStreamFileSystem.is_open()) {
-            fprintf(stderr, "cloud not open %s\n",
-                    ("test" + std::to_string(transportStreamPacketNumber) + ".ts").c_str());
+            fprintf(stderr, "cloud not open %s\n", name.c_str());
             return -1;
         }
         writeTable();

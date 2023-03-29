@@ -138,7 +138,7 @@ public:
                 /*处理请求，接收客户端发过来的数据*/
                 ret = rtsp.parseRtsp(packet, data);
                 if (ret < 0) {
-                    fprintf(stderr, "解析rtsp失败\n");
+                    fprintf(stderr, "rtsp.parseRtsp失败\n");
                     return ret;
                 }
 

@@ -23,6 +23,14 @@ struct SdpInfo {
     std::string name;
     std::map<std::string, std::string> timing;
     std::map<std::string, std::string> media[2];
+    uint8_t spsData[50];
+    uint8_t spsSize{0};
+    uint8_t ppsData[50];
+    uint8_t ppsSize{0};
+
+    uint8_t audioObjectType{0};
+    uint8_t samplingFrequencyIndex{0};
+    uint8_t channelConfiguration{0};
 };
 
 
@@ -85,7 +93,6 @@ private:
 
     std::thread *videoSendThread{nullptr};
     std::thread *audioSendThread{nullptr};
-    std::thread *receiveThread{nullptr};
 
     uint8_t videoChannel{0};
     uint8_t audioChannel{0};
@@ -112,9 +119,9 @@ public:
     /* bool videoSendError{false};
      bool audioSendError{false};*/
 
-    std::string aacConfig;
-    std::string sprop_parameter_sets;
-    std::string profileLevelId;
+//    std::string aacConfig;
+//    std::string sprop_parameter_sets;
+//    std::string profileLevelId;
 
 public:
     int init(SOCKET socket);
@@ -124,16 +131,15 @@ public:
     ~Rtsp();
 
 private:
-    /*sps数据，带start code*/
-    uint8_t sps[50];
-    /*pps数据，带start code*/
-    uint8_t pps[50];
-
+    std::string videoControl;
+    std::string audioControl;
+    std::string uniqueSession;
 
     bool stopVideoSendFlag{true};
     bool stopAudioSendFlag{true};
 
-    std::string dir{"test/"};
+    /*拉流用的*/
+    std::string dir;
 
     /*
      double lastDuration{0};
@@ -144,7 +150,7 @@ private:
      int packageTransportStream(const NALPicture *picture);*/
 
 
-    int receiveData(std::string &packet);
+    int receiveData(std::string &packet, const std::string &session) const;
 
     int getRtpHeader(ReadStream &rs);
 
@@ -153,16 +159,16 @@ private:
 
     int sendAudio(uint32_t number);
 
-    int parseSdp(const std::string &sdp, SdpInfo sdpInfo);
+    static int parseSdp(const std::string &sdp, SdpInfo &sdpInfo);
 
-    int parseMediaLevel(int i, const std::vector<std::string> &list, SdpInfo sdpInfo);
+    static int parseMediaLevel(int i, const std::vector<std::string> &list, SdpInfo &sdpInfo);
 
     int
     disposeRtpData(TransportPacket &ts, uint8_t *rtpBuffer, uint32_t rtpBufferSize, uint8_t channel, uint16_t length);
 
-    /*int muxTransportStream(uint8_t channel, uint8_t *data, uint32_t size);*/
+    /*instatic t muxTransportStream(uint8_t channel, uint8_t *data, uint32_t size);*/
 
-    int parseAACConfig(const std::string &config);
+    static int parseAACConfig(const std::string &config, SdpInfo &sdpInfo);
 
 
 };

@@ -499,7 +499,6 @@ int NALReader::getVideoFrame1(NALPicture *&picture) {
 int NALReader::test1(NALPicture *&picture, uint8_t *data, uint32_t size, uint8_t startCodeLength) {
     int ret;
 
-    //   uint8_t num = flag ? 4 : 0;
     if (picture->pictureFinishFlag) {
         picture = unoccupiedPicture;
     }

@@ -16,7 +16,7 @@
 
 static std::map<std::string, Info> flowInfo;
 /*当前写到第几个ts包了*/
-uint32_t transportStreamPacketNumber{0};
+//uint32_t transportStreamPacketNumber{0};
 enum {
     /*多个nalu在一个rtp包*/
     STAP_A = 24,
@@ -34,7 +34,7 @@ enum {
 
 int Rtsp::init(SOCKET socket) {
     clientSocket = socket;
-    nalUintData = new uint8_t[NALReader::MAX_BUFFER_SIZE];
+    //nalUintData = new uint8_t[NALReader::MAX_BUFFER_SIZE];
 
     // nalReader.init1();
 
@@ -42,11 +42,11 @@ int Rtsp::init(SOCKET socket) {
 //    aacHeader = aacFrameData;
 //    aacData = &aacFrameData[7];
 
-    frame = nalReader.allocPicture();
-    if (frame == nullptr) {
-        fprintf(stderr, "获取frame失败\n");
-        return -1;
-    }
+//    frame = nalReader.allocPicture();
+//    if (frame == nullptr) {
+//        fprintf(stderr, "获取frame失败\n");
+//        return -1;
+//    }
     /*fs.open("resource/bbbbbb.aac", std::ios::binary | std::ios::out | std::ios::trunc);
     if (!fs.is_open()) {
         fprintf(stderr, "cloud not open %s\n", "resource/bbbbbb.aac");
@@ -160,20 +160,46 @@ indexdeltalength=3：表示音频的访问单元索引差值（AU-Index-delta）
             0：单 NALU 模式。视频流中的每个 NALU 都被分配到单独的 RTP 包中。
             1：分片模式。视频流一个NALU会切割分到不同的rtp包中
          * */
-        /* "m=video 0 RTP/AVP 96\r\n"
-                       "a=rtpmap:96 H264/90000\r\n"
-                       "a=fmtp:96 packetization-mode=1;sprop-parameter-sets=%s;profile-level-id=%s;\r\n"
-                       "a=control:video\r\n",*/
-        /*"m=audio 0 RTP/AVP 97\r\n"
-                "a=rtpmap:97 mpeg4-generic/%s/%s\r\n"
-                "a=fmtp:97 SizeLength=13;IndexLength=3;IndexDeltaLength=3;config=%s\r\n"
-                "a=control:audio\r\n",*/
+
+        std::string session;
+        /*这个语法是C++ 17的*/
+        for (auto &[key, value]: flowInfo) {
+            if (value.dir == urlUtils.getPath()) {
+                session = value.session;
+                dir = value.dir;
+                break;
+            }
+        }
+        if (session.empty()) {
+            sprintf(responseBuffer,
+                    "RTSP/1.0 404 找不到流\r\n"
+                    "CSeq: %s\r\n"
+                    "Date: %s\r\n"
+                    "Server: XiaoFeng\r\n"
+                    "Connection: Close\r\n"
+                    "\r\n",
+                    obj["CSeq"].c_str(),
+                    generatorDate().c_str()
+            );
+            ret = TcpSocket::sendData(clientSocket, reinterpret_cast<uint8_t *>(responseBuffer),
+                                      static_cast<int>(strlen(responseBuffer)));
+            if (ret < 0) {
+                fprintf(stderr, "发送数据失败\n");
+                return ret;
+            }
+            return -1;
+        }
+        SdpInfo &sdpInfo = flowInfo[session].sdp;
+
+
+        /* todo 这里可以根据写入的流来自己生成sdp的一些信息 */
+
         std::string videoFmtp;
         std::string videoRtpmap;
-        std::string videoControl;
+        //std::string videoControl;
         std::string audioFmtp;
         std::string audioRtpmap;
-        std::string audioControl;
+        // std::string audioControl;
 
         for (std::map<std::string, std::string> &map: sdpInfo.media) {
             if (map["type"] == "video" && map.count("fmtp") && map.count("rtpmap")) {
@@ -211,6 +237,8 @@ indexdeltalength=3：表示音频的访问单元索引差值（AU-Index-delta）
                 audioFmtp.c_str(),
                 audioControl.c_str()
         );
+        /*给每个拉流的生成一个唯一id*/
+        uniqueSession = generate_unique_string();
         /*上面这里使用从推流端传过来的信息，在sdpInfo里，然后返回给拉流端*/
         /*%zu 为无符号整型*/
         sprintf(responseBuffer,
@@ -219,21 +247,45 @@ indexdeltalength=3：表示音频的访问单元索引差值（AU-Index-delta）
                 "Content-Base: %s\r\n"
                 "Content-type: application/sdp\r\n"
                 "Content-length: %zu\r\n"
+                "Session: %s\r\n"
                 "\r\n"
                 "%s",
                 obj["CSeq"].c_str(),
                 url,
                 strlen(sdp),
+                uniqueSession.c_str(),
                 sdp
         );
         ret = TcpSocket::sendData(clientSocket, reinterpret_cast<uint8_t *>(responseBuffer),
                                   static_cast<int>(strlen(responseBuffer)));
         if (ret < 0) {
-            fprintf(stderr, "发送数据失败 -> option\n");
-
+            fprintf(stderr, "发送数据失败\n");
             return ret;
         }
     } else if (strcmp(method, "ANNOUNCE") == 0) {
+
+        for (std::pair<const std::string, Info> &item: flowInfo) {
+            if (item.second.dir == urlUtils.getPath()) {
+                sprintf(responseBuffer,
+                        "RTSP/1.0 500 换个路径\r\n"
+                        "CSeq: %s\r\n"
+                        "Date: %s\r\n"
+                        "Server: XiaoFeng\r\n"
+                        "\r\n",
+                        obj["CSeq"].c_str(),
+                        generatorDate().c_str()
+                );
+                ret = TcpSocket::sendData(clientSocket, reinterpret_cast<uint8_t *>(responseBuffer),
+                                          static_cast<int>(strlen(responseBuffer)));
+                if (ret < 0) {
+                    fprintf(stderr, "发送数据失败\n");
+                    return ret;
+                }
+                /*这里直接退出，并且关闭连接，也可以继续等待客户端重新发送请求*/
+                return -1;
+            }
+        }
+
 
         if (obj.count("Content-Length") > 0) {
             int size = std::stoi(obj["Content-Length"]);
@@ -244,16 +296,39 @@ indexdeltalength=3：表示音频的访问单元索引差值（AU-Index-delta）
                     packet.erase(0, size);
 
 
-                    std::string uniqueString = generate_unique_string();
+                    /*推流上来会生成一个唯一的session*/
+                    uniqueSession = generate_unique_string();
 
                     Info info;
-                    info.session = uniqueString;
+                    info.session = uniqueSession;
                     info.dir = urlUtils.getPath();
                     ret = parseSdp(sdp, info.sdp);
                     if (ret < 0) {
+                        sprintf(responseBuffer,
+                                "RTSP/1.0 500 解析SDP失败\r\n"
+                                "CSeq: %s\r\n"
+                                "Date: %s\r\n"
+                                "Server: XiaoFeng\r\n"
+                                "\r\n",
+                                obj["CSeq"].c_str(),
+                                generatorDate().c_str()
+                        );
+                        ret = TcpSocket::sendData(clientSocket, reinterpret_cast<uint8_t *>(responseBuffer),
+                                                  static_cast<int>(strlen(responseBuffer)));
+                        if (ret < 0) {
+                            fprintf(stderr, "发送数据失败\n");
+                            return ret;
+                        }
                         return 0;
                     }
-                    flowInfo[uniqueString] = info;
+                    for (auto &media: info.sdp.media) {
+                        if (media["type"] == "video") {
+                            videoControl = media["control"];
+                        } else if (media["type"] == "audio") {
+                            audioControl = media["control"];
+                        }
+                    }
+                    flowInfo[uniqueSession] = info;
 
                     sprintf(responseBuffer,
                             "RTSP/1.0 200 OK\r\n"
@@ -264,13 +339,12 @@ indexdeltalength=3：表示音频的访问单元索引差值（AU-Index-delta）
                             "\r\n",
                             obj["CSeq"].c_str(),
                             generatorDate().c_str(),
-                            uniqueString.c_str()
+                            uniqueSession.c_str()
                     );
                     ret = TcpSocket::sendData(clientSocket, reinterpret_cast<uint8_t *>(responseBuffer),
                                               static_cast<int>(strlen(responseBuffer)));
                     if (ret < 0) {
-                        fprintf(stderr, "发送数据失败 -> option\n");
-
+                        fprintf(stderr, "发送数据失败\n");
                         return ret;
                     }
                     break;
@@ -290,7 +364,21 @@ indexdeltalength=3：表示音频的访问单元索引差值（AU-Index-delta）
 
         } else {
             fprintf(stderr, "ANNOUNCE 请求里没有SDP信息\n");
-
+            sprintf(responseBuffer,
+                    "RTSP/1.0 451 参数有问题\r\n"
+                    "CSeq: %s\r\n"
+                    "Date: %s\r\n"
+                    "Server: XiaoFeng\r\n"
+                    "\r\n",
+                    obj["CSeq"].c_str(),
+                    generatorDate().c_str()
+            );
+            ret = TcpSocket::sendData(clientSocket, reinterpret_cast<uint8_t *>(responseBuffer),
+                                      static_cast<int>(strlen(responseBuffer)));
+            if (ret < 0) {
+                fprintf(stderr, "发送数据失败\n");
+                return ret;
+            }
             return -1;
         }
 
@@ -304,44 +392,94 @@ indexdeltalength=3：表示音频的访问单元索引差值（AU-Index-delta）
         num = sscanf(obj["Transport"].c_str(), "%[^;];%[^;];%[^;]", protocol, type, interleaved);
         if (num != 3) {
             fprintf(stderr, "解析Transport错误 = %s\n", obj["Transport"].c_str());
-
+            sprintf(responseBuffer,
+                    "RTSP/1.0 451 解析Transport错误\r\n"
+                    "CSeq: %s\r\n"
+                    "Date: %s\r\n"
+                    "Server: XiaoFeng\r\n"
+                    "\r\n",
+                    obj["CSeq"].c_str(),
+                    generatorDate().c_str()
+            );
+            ret = TcpSocket::sendData(clientSocket, reinterpret_cast<uint8_t *>(responseBuffer),
+                                      static_cast<int>(strlen(responseBuffer)));
+            if (ret < 0) {
+                fprintf(stderr, "发送数据失败\n");
+                return ret;
+            }
             return -1;
         }
         if (strcmp(protocol, "RTP/AVP/TCP") != 0) {
             fprintf(stderr, "只支持TCP传输\n");
-
+            sprintf(responseBuffer,
+                    "RTSP/1.0 501 只支持TCP传输\r\n"
+                    "CSeq: %s\r\n"
+                    "Date: %s\r\n"
+                    "Server: XiaoFeng\r\n"
+                    "\r\n",
+                    obj["CSeq"].c_str(),
+                    generatorDate().c_str()
+            );
+            ret = TcpSocket::sendData(clientSocket, reinterpret_cast<uint8_t *>(responseBuffer),
+                                      static_cast<int>(strlen(responseBuffer)));
+            if (ret < 0) {
+                fprintf(stderr, "发送数据失败\n");
+                return ret;
+            }
             return -1;
         }
 
-        // 截取第三个斜杠后面的子串，就是路径部分
-        std::string path = urlUtils.getPath();
 
         uint8_t rtpChannel = 0;
         uint8_t rtcpChannel = 0;
         num = sscanf(interleaved, "interleaved=%hhu-%hhu", &rtpChannel, &rtcpChannel);
         if (num != 2) {
-            fprintf(stderr, "解析port错误\n");
-
+            fprintf(stderr, "解析port错误  %s\n", interleaved);
+            sprintf(responseBuffer,
+                    "RTSP/1.0 451 解析port错误\r\n"
+                    "CSeq: %s\r\n"
+                    "Date: %s\r\n"
+                    "Server: XiaoFeng\r\n"
+                    "\r\n",
+                    obj["CSeq"].c_str(),
+                    generatorDate().c_str()
+            );
+            ret = TcpSocket::sendData(clientSocket, reinterpret_cast<uint8_t *>(responseBuffer),
+                                      static_cast<int>(strlen(responseBuffer)));
+            if (ret < 0) {
+                fprintf(stderr, "发送数据失败\n");
+                return ret;
+            }
             return -1;
         }
 
+        // 截取第三个斜杠后面的子串，就是路径部分
+        std::string path = urlUtils.getPath();
         std::vector<std::string> pathList = split(path, "/");
 
         /*如果是推流，rtpChannel 表示推流上来的数据是音频还是视频，推流就用ANNOUNCE请求里的control字段来判断当前SETUP请求里rtpChannel是音频还是视频*/
         /*如果是拉流，rtpChannel 表示拉流的数据是音频还是视频，拉流就用我发送给客户端的DESCRIBE请求里的control字段来判断当前SETUP请求里rtpChannel是音频还是视频*/
-
-        if (obj.find("Session") != obj.end() && flowInfo.find(obj["Session"]) != flowInfo.end()) {
-            SdpInfo &sdpInfo = flowInfo[obj["Session"]].sdp;
-            for (std::map<std::string, std::string> &aaa: sdpInfo.media) {
-                if (aaa["type"] == "video" && pathList.back() == aaa["control"]) {
-                    videoChannel = rtpChannel;
-                } else if (aaa["type"] == "audio" && pathList.back() == aaa["control"]) {
-                    audioChannel = rtpChannel;
-                }
-
-            }
+        if (pathList.back() == videoControl) {
+            videoChannel = rtpChannel;
+        } else if (pathList.back() == audioControl) {
+            audioChannel = rtpChannel;
         } else {
-            fprintf(stderr, "没找到Session\n");
+            fprintf(stderr, "没找到对应的流 -- %s\n", pathList.back().c_str());
+            sprintf(responseBuffer,
+                    "RTSP/1.0 500 没找到对应的流\r\n"
+                    "CSeq: %s\r\n"
+                    "Date: %s\r\n"
+                    "Server: XiaoFeng\r\n"
+                    "\r\n",
+                    obj["CSeq"].c_str(),
+                    generatorDate().c_str()
+            );
+            ret = TcpSocket::sendData(clientSocket, reinterpret_cast<uint8_t *>(responseBuffer),
+                                      static_cast<int>(strlen(responseBuffer)));
+            if (ret < 0) {
+                fprintf(stderr, "发送数据失败\n");
+                return ret;
+            }
             return -1;
         }
 
@@ -362,7 +500,7 @@ indexdeltalength=3：表示音频的访问单元索引差值（AU-Index-delta）
         ret = TcpSocket::sendData(clientSocket, reinterpret_cast<uint8_t *>(responseBuffer),
                                   static_cast<int>(strlen(responseBuffer)));
         if (ret < 0) {
-            fprintf(stderr, "发送数据失败 -> option\n");
+            fprintf(stderr, "发送数据失败\n");
 
             return ret;
         }
@@ -388,25 +526,37 @@ indexdeltalength=3：表示音频的访问单元索引差值（AU-Index-delta）
         }
 
         /*这里接收客户端传过来的音视频数据，组帧*/
-        /* todo 这里可以尝试开辟一下子线程去接收数据 */
-        /* todo 还有就是如果有多个人推流的时候也要处理 */
-
-
-        receiveThread = new std::thread(&Rtsp::receiveData, this, packet);
-        /*ret = receiveData(packet);
+        ret = receiveData(packet, obj["Session"]);
         if (ret < 0) {
             fprintf(stderr, "receiveData 失败\n");
+            memset(responseBuffer, 0, 1024);
+            sprintf(responseBuffer,
+                    "RTSP/1.0 500 接收音视频数据失败\r\n"
+                    "CSeq: %s\r\n"
+                    "Date: %s\r\n"
+                    "Server: XiaoFeng\r\n"
+                    "\r\n",
+                    obj["CSeq"].c_str(),
+                    generatorDate().c_str()
+            );
+            ret = TcpSocket::sendData(clientSocket, reinterpret_cast<uint8_t *>(responseBuffer),
+                                      static_cast<int>(strlen(responseBuffer)));
+            if (ret < 0) {
+                fprintf(stderr, "发送数据失败\n");
+                return ret;
+            }
             return ret;
-        }*/
+        }
 
     } else if (strcmp(method, "PLAY") == 0) { //向服务端发起播放请求
         sprintf(responseBuffer,
                 "RTSP/1.0 200 OK\r\n"
                 "CSeq: %s\r\n"
                 "Range: npt=0.000-\r\n"
-                "Session: 66334873; timeout=60\r\n"
+                "Session: %s; timeout=60\r\n"
                 "\r\n",
-                obj["CSeq"].c_str()
+                obj["CSeq"].c_str(),
+                obj["Session"].c_str()
         );
         ret = TcpSocket::sendData(clientSocket, reinterpret_cast<uint8_t *>(responseBuffer),
                                   static_cast<int>(strlen(responseBuffer)));
@@ -414,8 +564,9 @@ indexdeltalength=3：表示音频的访问单元索引差值（AU-Index-delta）
             fprintf(stderr, "发送数据失败 -> option\n");
             return ret;
         }
+        uint32_t transportStreamPacketNumber = flowInfo[obj["Session"]].transportStreamPacketNumber;
 
-        if (transportStreamPacketNumber - 2 < 0) {
+        if (transportStreamPacketNumber - 1 < 0) {
             fprintf(stderr, "还没准备好，等一会儿在拉流\n");
             return -1;
         }
@@ -430,9 +581,11 @@ indexdeltalength=3：表示音频的访问单元索引差值（AU-Index-delta）
                 "CSeq: %s\r\n"
                 "Date: %s\r\n"
                 "Server: XiaoFeng\r\n"
+                "Session: %s\r\n"
                 "\r\n",
                 obj["CSeq"].c_str(),
-                generatorDate().c_str()
+                generatorDate().c_str(),
+                obj["Session"].c_str()
         );
         ret = TcpSocket::sendData(clientSocket, reinterpret_cast<uint8_t *>(responseBuffer),
                                   static_cast<int>(strlen(responseBuffer)));
@@ -453,9 +606,11 @@ indexdeltalength=3：表示音频的访问单元索引差值（AU-Index-delta）
                 "CSeq: %s\r\n"
                 "Date: %s\r\n"
                 "Server: XiaoFeng\r\n"
+                "Session: %s\r\n"
                 "\r\n",
                 obj["CSeq"].c_str(),
-                generatorDate().c_str()
+                generatorDate().c_str(),
+                obj["Session"].c_str()
         );
         ret = TcpSocket::sendData(clientSocket, reinterpret_cast<uint8_t *>(responseBuffer),
                                   static_cast<int>(strlen(responseBuffer)));
@@ -472,20 +627,48 @@ indexdeltalength=3：表示音频的访问单元索引差值（AU-Index-delta）
 }
 
 
-int Rtsp::receiveData(std::string &packet) {
+int Rtsp::receiveData(std::string &packet, const std::string &session) const {
 
 
     int ret;
 
-    RtspReceiveData receive;
-    TransportPacket ts;
-    /*接收rtsp数据，存为ts*/
+    Info &info = flowInfo[session];
+    RtspReceiveData receive(info.transportStreamPacketNumber);
+    ret = receive.init(clientSocket, info.dir, videoChannel, audioChannel);
+    if (ret < 0) {
+        fprintf(stderr, "receive.init失败\n");
+        return ret;
+    }
+    ret = receive.writeVideoData(info.sdp.spsData, info.sdp.spsSize);
+    if (ret < 0) {
+        fprintf(stderr, "receive.writeData失败\n");
+        return ret;
+    }
+    ret = receive.writeVideoData(info.sdp.ppsData, info.sdp.ppsSize);
+    if (ret < 0) {
+        fprintf(stderr, "receive.writeData失败\n");
+        return ret;
+    }
+    ret = receive.writeAudioData(info.sdp.audioObjectType, info.sdp.samplingFrequencyIndex,
+                                 info.sdp.channelConfiguration);
+    if (ret < 0) {
+        fprintf(stderr, "receive.writeAudioData失败\n");
+        return ret;
+    }
+    ret = receive.receiveData(packet);
+    if (ret < 0) {
+        fprintf(stderr, "receive.receiveData失败\n");
+        return ret;
+    }
+
+    /*TransportPacket ts;
+    *//*接收rtsp数据，存为ts*//*
     ts.init("test/");
 
-    /*一个rtp包最大大小不会超过16个bit也就是65535*/
+    *//*一个rtp包最大大小不会超过16个bit也就是65535*//*
     uint8_t *buffer = new uint8_t[65535]; // NOLINT(modernize-use-auto)
     // todo delete buffer
-    /*packet这里面有可能还有剩余的字节没读取完*/
+    *//*packet这里面有可能还有剩余的字节没读取完*//*
     memcpy(buffer, packet.c_str(), packet.length());
     uint32_t bufferSize = packet.length();
 
@@ -501,7 +684,7 @@ int Rtsp::receiveData(std::string &packet) {
                 return ret;
             }
             bufferSize += size;
-            /*这里跳过这个循环，因为有可能，还取不到四个字节数据*/
+            *//*这里跳过这个循环，因为有可能，还取不到四个字节数据*//*
             continue;
         }
         uint8_t magic = buffer[0];
@@ -510,14 +693,14 @@ int Rtsp::receiveData(std::string &packet) {
             return -1;
         }
         uint8_t channel = buffer[1];
-        /*这个rtp包剩余数据大小*/
+        *//*这个rtp包剩余数据大小*//*
         uint16_t length = buffer[2] << 8 | buffer[3];
 
         rtpBuffer = buffer + 4;
         rtpBufferSize = bufferSize - 4;
         while (true) {
             if (rtpBufferSize < length) {
-                /*不够rtp包大小继续取数据，直到取到为止*/
+                *//*不够rtp包大小继续取数据，直到取到为止*//*
                 ret = TcpSocket::receive(clientSocket, (char *) (rtpBuffer + rtpBufferSize), size);
                 if (ret < 0) {
                     fprintf(stderr, "TcpSocket::receive 失败\n");
@@ -525,20 +708,20 @@ int Rtsp::receiveData(std::string &packet) {
                 }
                 rtpBufferSize += size;
             } else {
-                /*处理数据*/
+                *//*处理数据*//*
                 ret = disposeRtpData(ts, rtpBuffer, rtpBufferSize, channel, length);
                 if (ret < 0) {
                     fprintf(stderr, "处理rtp包失败\n");
                     return ret;
                 }
                 rtpBufferSize -= length;
-                /*这里不用使用memmove,不会发生内存重叠*/
+                *//*这里不用使用memmove,不会发生内存重叠*//*
                 memcpy(buffer, rtpBuffer + length, rtpBufferSize);
                 bufferSize = rtpBufferSize;
                 break;
             }
         }
-    }
+    }*/
 
 
     return 0;
@@ -605,7 +788,7 @@ int Rtsp::disposeRtpData(TransportPacket &ts, uint8_t *rtpBuffer, uint32_t rtpBu
                 }
                 if (frame->pictureFinishFlag) {
                     /*获取到完整的一帧,做对应操作*/
-                    ret = ts.writeTransportStream(frame, transportStreamPacketNumber);
+                    // ret = ts.writeTransportStream(frame, transportStreamPacketNumber);
                     if (ret < 0) {
                         fprintf(stderr, "ts.writeVideo 失败\n");
                         return -1;
@@ -631,7 +814,7 @@ int Rtsp::disposeRtpData(TransportPacket &ts, uint8_t *rtpBuffer, uint32_t rtpBu
 
 
             if (frame->pictureFinishFlag) {
-                ret = ts.writeTransportStream(frame, transportStreamPacketNumber);
+//                ret = ts.writeTransportStream(frame, transportStreamPacketNumber);
                 if (ret < 0) {
                     fprintf(stderr, "ts.writeVideo 失败\n");
                     return -1;
@@ -700,9 +883,8 @@ int Rtsp::sendVideo(uint32_t number) {
     RtpPacket videoPacket;
     videoPacket.init(NALReader::MAX_BUFFER_SIZE, RTP_PAYLOAD_TYPE_H264);
 
-    //   std::chrono::time_point<std::chrono::high_resolution_clock> start = std::chrono::high_resolution_clock::now();
 
-    std::chrono::time_point<std::chrono::high_resolution_clock> currentTime;
+    //  std::chrono::time_point<std::chrono::high_resolution_clock> currentTime;
     std::chrono::duration<int, std::micro> elapsed{};
     /* clock_t currentTime;
      clock_t lastTime = clock();*/
@@ -872,7 +1054,7 @@ int Rtsp::sendAudio(uint32_t number) {
      return 0;*/
 }
 
-int Rtsp::parseSdp(const std::string &sdp, SdpInfo sdpInfo) {
+int Rtsp::parseSdp(const std::string &sdp, SdpInfo &sdpInfo) {
     int ret;
     std::vector<std::string> list = split(sdp, "\r\n");
 
@@ -904,22 +1086,20 @@ int Rtsp::parseSdp(const std::string &sdp, SdpInfo sdpInfo) {
                 sdpInfo.timing["stop"] = timingList[1];
             } else if (key == "m") {
                 /*遇到媒体层了*/
-                ret = parseMediaLevel(i, list);
+                ret = parseMediaLevel(i, list, sdpInfo);
                 if (ret < 0) {
                     return ret;
                 }
                 break;
             }
 
-
-            //obj[key] = value;
         }
     }
     return 0;
 }
 
 
-int Rtsp::parseMediaLevel(int i, const std::vector<std::string> &list, SdpInfo sdpInfo) {
+int Rtsp::parseMediaLevel(int i, const std::vector<std::string> &list, SdpInfo &sdpInfo) {
     int ret;
     int num = -1;
     for (int j = i; j < list.size(); ++j) {
@@ -954,32 +1134,34 @@ int Rtsp::parseMediaLevel(int i, const std::vector<std::string> &list, SdpInfo s
 
                             // uint8_t sps[50];
                             /* todo 等会儿删除 */
-                            memcpy(sps, startCode, 4);
-                            ret = base64_decode(sps_pps[0], sps + 4);
+                            memcpy(sdpInfo.spsData, startCode, 4);
+                            ret = base64_decode(sps_pps[0], sdpInfo.spsData + 4);
                             if (ret < 0) {
                                 fprintf(stderr, "解析sps失败\n");
                                 return ret;
                             }
+                            sdpInfo.spsSize = ret + 4;
                             //                            spsSize = ret;
-                            ret = nalReader.test1(frame, sps, ret + 4, 4);
-                            if (ret < 0) {
-                                fprintf(stderr, "nalReader.getPicture 失败\n");
-                                return -1;
-                            }
+//                            ret = nalReader.test1(frame, sps, ret + 4, 4);
+//                            if (ret < 0) {
+//                                fprintf(stderr, "nalReader.getPicture 失败\n");
+//                                return -1;
+//                            }
 
                             // uint8_t pps[50];
-                            memcpy(pps, startCode, 4);
-                            ret = base64_decode(sps_pps[1], pps + 4);
+                            memcpy(sdpInfo.ppsData, startCode, 4);
+                            ret = base64_decode(sps_pps[1], sdpInfo.ppsData + 4);
                             if (ret < 0) {
                                 fprintf(stderr, "解析pps失败\n");
                                 return ret;
                             }
+                            sdpInfo.ppsSize = ret + 4;
                             //                            ppsSize = ret;
-                            ret = nalReader.test1(frame, pps, ret + 4, 4);
-                            if (ret < 0) {
-                                fprintf(stderr, "nalReader.getPicture 失败\n");
-                                return -1;
-                            }
+//                            ret = nalReader.test1(frame, pps, ret + 4, 4);
+//                            if (ret < 0) {
+//                                fprintf(stderr, "nalReader.getPicture 失败\n");
+//                                return -1;
+//                            }
                         } else {
                             fprintf(stderr, "解析错误\n");
                             return -1;
@@ -991,7 +1173,7 @@ int Rtsp::parseMediaLevel(int i, const std::vector<std::string> &list, SdpInfo s
                             //                            fmtp:97 profile-level-id=1;mode=AAC-hbr;sizelength=13;indexlength=3;indexdeltalength=3; config=119056E500
                             std::map<std::string, std::string> obj = getObj(split(right, ";"), "=");
                             sdpInfo.media[num]["fmtp"] = right;
-                            ret = parseAACConfig(obj["config"]);
+                            ret = parseAACConfig(obj["config"], sdpInfo);
                             if (ret < 0) {
                                 return ret;
                             }
@@ -1013,7 +1195,7 @@ int Rtsp::parseMediaLevel(int i, const std::vector<std::string> &list, SdpInfo s
 }
 
 
-int Rtsp::parseAACConfig(const std::string &config) {
+int Rtsp::parseAACConfig(const std::string &config, SdpInfo &sdpInfo) {
     // 把十六进制字符串转换成二进制字符串
     std::string bin;
     for (char i: config) {
@@ -1073,15 +1255,17 @@ int Rtsp::parseAACConfig(const std::string &config) {
     }
 
     // 按照MPEG-4音频标准中的规则，把二进制字符串分成以下几个字段，并输出它们的值
-    uint8_t audioObjectType = std::stoi(bin.substr(0, 5), nullptr, 2); // 前5位，表示音频对象类型（Audio Object Type）
-    uint8_t samplingFrequencyIndex = std::stoi(bin.substr(5, 4), nullptr, 2); // 后4位，表示采样率索引（Sampling Frequency Index）
-    uint8_t channelConfiguration = std::stoi(bin.substr(9, 4), nullptr, 2); // 后4位，表示声道配置（Channel Configuration）
+    sdpInfo.audioObjectType = std::stoi(bin.substr(0, 5), nullptr, 2); // 前5位，表示音频对象类型（Audio Object Type）
+    sdpInfo.samplingFrequencyIndex = std::stoi(bin.substr(5, 4), nullptr, 2); // 后4位，表示采样率索引（Sampling Frequency Index）
+    sdpInfo.channelConfiguration = std::stoi(bin.substr(9, 4), nullptr, 2); // 后4位，表示声道配置（Channel Configuration）
     uint8_t GASpecificConfig = std::stoi(bin.substr(13, 3), nullptr, 2); // 后3位，表示全局音频特定配置信息
 
+
+
     /*写入adts header*/
-    WriteStream ws(AdtsHeader::header, 7);
-    adtsHeader.setConfig(audioObjectType - 1, samplingFrequencyIndex, channelConfiguration, 0);
-    adtsHeader.writeAdtsHeader(ws);
+//    WriteStream ws(AdtsHeader::header, 7);
+//    adtsHeader.setConfig(audioObjectType - 1, samplingFrequencyIndex, channelConfiguration, 0);
+//    adtsHeader.writeAdtsHeader(ws);
 
     return 0;
 }
@@ -1089,6 +1273,8 @@ int Rtsp::parseAACConfig(const std::string &config) {
 
 Rtsp::~Rtsp() {
     printf("~Rtsp 析构\n");
+
+    flowInfo.erase(uniqueSession);
     stopVideoSendFlag = false;
     stopAudioSendFlag = false;
     if (videoSendThread && videoSendThread->joinable()) {

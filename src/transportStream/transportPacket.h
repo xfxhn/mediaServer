@@ -91,7 +91,7 @@ private:
 
     uint64_t time{0};
 public:
-    int init(const char *path);
+    int init(std::string path);
 
     int writeTransportStream(const NALPicture *picture, uint32_t &transportStreamPacketNumber);
 

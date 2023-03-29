@@ -5,8 +5,10 @@ project(rtsp)
 #add_compile_options("/utf-8")
 
 add_compile_definitions("_CRT_SECURE_NO_WARNINGS")
-#cpp11标准
-set(CMAKE_CXX_STANDARD 11)
+
+set(CMAKE_CXX_STANDARD 17)
+##cpp11标准
+#set(CMAKE_CXX_STANDARD 11)
 #关闭编译器扩展
 set(CMAKE_CXX_EXTENSIONS OFF)
 #指定必须要11标准，不然cmake会自己找

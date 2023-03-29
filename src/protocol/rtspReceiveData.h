@@ -42,9 +42,10 @@ private:
     /*用于标识同步信源。该标识符是随机选择的，参加同一视频会议的两个同步信源不能有相同的SSRC*/
     uint32_t ssrc{0};
 private:
+    SOCKET clientSocket{0};
     uint8_t videoChannel{0};
     uint8_t audioChannel{0};
-    SOCKET clientSocket;
+
     TransportPacket ts;
     uint8_t *buffer{nullptr};
     uint8_t *nalUintData{nullptr};
@@ -55,10 +56,19 @@ private:
     NALPicture *picture{nullptr};
     AdtsReader audioReader;
     AdtsHeader adtsHeader;
-public:
-    int init(SOCKET socket, uint8_t video, uint8_t audio);
 
-    int receiveData(const std::string& packet);
+
+    uint32_t &packetNumber;
+public:
+    explicit RtspReceiveData(uint32_t &transportStreamPacketNumber);
+
+    int init(SOCKET socket, const std::string &path, uint8_t video, uint8_t audio);
+
+    int writeVideoData(uint8_t *data, uint8_t size);
+
+    int writeAudioData(uint8_t audioObjectType, uint8_t samplingFrequencyIndex, uint8_t channelConfiguration);
+
+    int receiveData(const std::string &packet);
 
     ~RtspReceiveData();
 
