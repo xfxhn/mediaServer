@@ -1,7 +1,6 @@
 ﻿
 #include "rtspReceiveData.h"
 
-#include <utility>
 
 enum {
     /*多个nalu在一个rtp包*/
@@ -51,7 +50,7 @@ RtspReceiveData::~RtspReceiveData() {
     delete[] nalUintData;
 }
 
-int RtspReceiveData::receiveData(const std::string &packet, std::mutex &mux) {
+int RtspReceiveData::receiveData(const std::string &packet) {
     int ret;
     if (buffer == nullptr) {
         fprintf(stderr, "请初始化\n");
@@ -99,7 +98,7 @@ int RtspReceiveData::receiveData(const std::string &packet, std::mutex &mux) {
                 rtpBufferSize += size;
             } else {
                 /*处理数据*/
-                ret = disposeRtpData(rtpBuffer, rtpBufferSize, channel, length, mux);
+                ret = disposeRtpData(rtpBuffer, rtpBufferSize, channel, length);
                 if (ret < 0) {
                     fprintf(stderr, "处理rtp包失败\n");
                     return ret;
@@ -116,8 +115,7 @@ int RtspReceiveData::receiveData(const std::string &packet, std::mutex &mux) {
 }
 
 
-int RtspReceiveData::disposeRtpData(uint8_t *rtpBuffer, uint32_t rtpBufferSize, uint8_t channel, uint16_t length,
-                                    std::mutex &mux) {
+int RtspReceiveData::disposeRtpData(uint8_t *rtpBuffer, uint32_t rtpBufferSize, uint8_t channel, uint16_t length) {
     int ret;
     if (channel == videoChannel) {
 
@@ -176,9 +174,7 @@ int RtspReceiveData::disposeRtpData(uint8_t *rtpBuffer, uint32_t rtpBufferSize, 
                 }
                 if (picture->pictureFinishFlag) {
                     /*获取到完整的一帧,做对应操作*/
-                    // mux.lock();
                     ret = ts.writeTransportStream(picture, packetNumber);
-                    //mux.unlock();
                     if (ret < 0) {
                         fprintf(stderr, "ts.writeVideo 失败\n");
                         return -1;

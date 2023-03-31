@@ -2,6 +2,7 @@
 
 #include <cstdio>
 #include <cstring>
+#include <thread>
 #include "util.h"
 #include "readStream.h"
 
@@ -255,14 +256,47 @@ void AdtsReader::disposeAudio(AdtsHeader &header, uint8_t *data, uint32_t size) 
 
 int AdtsReader::getTransportStreamData() {
     int ret;
-
+    std::string name;
+    uint8_t offset = 0;
+    uint32_t size;
     while (true) {
-        fs.read(reinterpret_cast<char *>(transportStreamBuffer), TRANSPORT_STREAM_PACKETS_SIZE);
-        uint32_t size = fs.gcount();
-        // bufferPosition += size;
-        if (size != TRANSPORT_STREAM_PACKETS_SIZE) {
+        fs.read(reinterpret_cast<char *>(transportStreamBuffer + offset), TRANSPORT_STREAM_PACKETS_SIZE - offset);
+        size = fs.gcount() + offset;
+        if (size == 0) {
+            uint32_t pos = fs.tellg();
             /*表示这个文件读完了，读下一个*/
-            /*这里ts文件，应该就是188的倍数，不是188的倍数，这个文件是有问题*/
+            fs.close();
+            name = "/test" + std::to_string(++currentPacket) + ".ts";
+            printf("读取%s文件 读取的size = %d audio\n", name.c_str(), size);
+            fs.open(path + name, std::ios::out | std::ios::binary);
+            if (!fs.is_open()) {
+                fprintf(stderr, "读取%s失败 audio\n", name.c_str());
+                /*如果是走到这里打开下一个文件失败，表示上个文件还没读完，继续读上个文件*/
+                name = "/test" + std::to_string(--currentPacket) + ".ts";
+                fs.open(path + name, std::ios::out | std::ios::binary);
+                /*返回到上次读取到的位置*/
+                fs.seekg(pos);
+                std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+                continue;
+            }
+
+            fs.read(reinterpret_cast<char *>(transportStreamBuffer), TRANSPORT_STREAM_PACKETS_SIZE);
+            size = fs.gcount();
+            if (size != TRANSPORT_STREAM_PACKETS_SIZE) {
+                fprintf(stderr, "没读到一个ts包的大小，read size = %d\n", size);
+                return -1;
+            }
+        } else if (size < TRANSPORT_STREAM_PACKETS_SIZE) {
+            fs.clear();
+            fprintf(stderr, "size < TRANSPORT_STREAM_PACKETS_SIZE %d,  audio\n", size);
+            offset = size;
+            std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+            continue;
+        }
+
+        /*if (size != TRANSPORT_STREAM_PACKETS_SIZE) {
+            *//*表示这个文件读完了，读下一个*//*
+            *//*这里ts文件，应该就是188的倍数，不是188的倍数，这个文件是有问题*//*
             fs.close();
             std::string name = "/test" + std::to_string(++currentPacket) + ".ts";
             printf("读取%s文件 audio\n", name.c_str());
@@ -278,7 +312,7 @@ int AdtsReader::getTransportStreamData() {
                 fprintf(stderr, "没读到一个ts包的大小，read size = %d\n", size);
                 return -1;
             }
-        }
+        }*/
         ReadStream rs(transportStreamBuffer, size);
         ret = demux.readFrame(rs);
         if (ret < 0) {

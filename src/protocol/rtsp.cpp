@@ -642,7 +642,6 @@ indexdeltalength=3：表示音频的访问单元索引差值（AU-Index-delta）
     return 0;
 }
 
-std::mutex mux;
 
 int Rtsp::receiveData(std::string &packet, const std::string &session) const {
 
@@ -672,7 +671,7 @@ int Rtsp::receiveData(std::string &packet, const std::string &session) const {
         fprintf(stderr, "receive.writeAudioData失败\n");
         return ret;
     }
-    ret = receive.receiveData(packet, mux);
+    ret = receive.receiveData(packet);
     if (ret < 0) {
         fprintf(stderr, "receive.receiveData失败\n");
         return ret;
@@ -904,9 +903,7 @@ int Rtsp::sendVideo(uint32_t number) {
     std::chrono::time_point<std::chrono::high_resolution_clock> start;
     while (stopVideoSendFlag) {
         start = std::chrono::high_resolution_clock::now();
-        //mux.lock();
         ret = reader.getVideoFrame1(picture);
-        // mux.unlock();
         if (ret < 0) {
             fprintf(stderr, "获取视频数据失败\n");
             stopFlag = false;
@@ -1074,7 +1071,6 @@ int Rtsp::sendAudio(uint32_t number) {
             //  audioSendError = true;
             return ret;
         }
-        idx += 1;
         /*得到一秒几帧*/
         fps = header.sample_rate / 1024;
         while (idx++ < fps && stopAudioSendFlag) {

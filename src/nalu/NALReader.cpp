@@ -71,9 +71,7 @@ int NALReader::getTransportStreamData() {
         size = fs.gcount() + offset;
         if (size == 0) {
             uint32_t pos = fs.tellg();
-            // end of file
             /*表示这个文件读完了，读下一个*/
-            /*这里ts文件，应该就是188的倍数，不是188的倍数，这个文件是有问题*/
             fs.close();
             name = "/test" + std::to_string(++currentPacket) + ".ts";
             printf("读取%s文件 读取的size = %d video\n", name.c_str(), size);
@@ -85,11 +83,8 @@ int NALReader::getTransportStreamData() {
                 fs.open(path + name, std::ios::out | std::ios::binary);
                 /*返回到上次读取到的位置*/
                 fs.seekg(pos);
-                std::this_thread::sleep_for(std::chrono::milliseconds(50));
+                std::this_thread::sleep_for(std::chrono::milliseconds(1000));
                 continue;
-                //currentPacket += 1;
-                /*fprintf(stderr, "open %s failed video\n", name.c_str());
-                return -1;*/
             }
 
             fs.read(reinterpret_cast<char *>(transportStreamBuffer), TRANSPORT_STREAM_PACKETS_SIZE);
@@ -100,11 +95,9 @@ int NALReader::getTransportStreamData() {
             }
         } else if (size < TRANSPORT_STREAM_PACKETS_SIZE) {
             fs.clear();
-            // fs.seekg(0, std::ios::end);
-            fprintf(stderr, "size < TRANSPORT_STREAM_PACKETS_SIZE %d, eof = %d, current = %d\n", size, fs.eof(),
-                    (int) fs.tellg());
+            fprintf(stderr, "size < TRANSPORT_STREAM_PACKETS_SIZE %d, video\n", size);
             offset = size;
-            std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+            std::this_thread::sleep_for(std::chrono::milliseconds(1200));
             continue;
         }
         /*走到这里肯定有188个字节*/

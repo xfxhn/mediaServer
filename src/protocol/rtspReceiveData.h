@@ -2,7 +2,6 @@
 #ifndef RTSP_RTSPRECEIVEDATA_H
 #define RTSP_RTSPRECEIVEDATA_H
 
-#include <mutex>
 #include "transportPacket.h"
 #include "TcpSocket.h"
 #include "NALReader.h"
@@ -69,14 +68,14 @@ public:
 
     int writeAudioData(uint8_t audioObjectType, uint8_t samplingFrequencyIndex, uint8_t channelConfiguration);
 
-    int receiveData(const std::string &packet, std::mutex &mux);
+    int receiveData(const std::string &packet);
 
     ~RtspReceiveData();
 
 private:
     int getRtpHeader(ReadStream &rs);
 
-    int disposeRtpData(uint8_t *rtpBuffer, uint32_t rtpBufferSize, uint8_t channel, uint16_t length , std::mutex &mux);
+    int disposeRtpData(uint8_t *rtpBuffer, uint32_t rtpBufferSize, uint8_t channel, uint16_t length);
 };
 
 
