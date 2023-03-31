@@ -19,7 +19,7 @@ enum {
 };
 static constexpr uint8_t startCode[4] = {0, 0, 0, 1};
 
-RtspReceiveData::RtspReceiveData(uint32_t &transportStreamPacketNumber) : packetNumber(transportStreamPacketNumber) {
+RtspReceiveData::RtspReceiveData(int &transportStreamPacketNumber) : packetNumber(transportStreamPacketNumber) {
 
 }
 
@@ -51,7 +51,7 @@ RtspReceiveData::~RtspReceiveData() {
     delete[] nalUintData;
 }
 
-int RtspReceiveData::receiveData(const std::string &packet) {
+int RtspReceiveData::receiveData(const std::string &packet, std::mutex &mux) {
     int ret;
     if (buffer == nullptr) {
         fprintf(stderr, "请初始化\n");
@@ -99,7 +99,7 @@ int RtspReceiveData::receiveData(const std::string &packet) {
                 rtpBufferSize += size;
             } else {
                 /*处理数据*/
-                ret = disposeRtpData(rtpBuffer, rtpBufferSize, channel, length);
+                ret = disposeRtpData(rtpBuffer, rtpBufferSize, channel, length, mux);
                 if (ret < 0) {
                     fprintf(stderr, "处理rtp包失败\n");
                     return ret;
@@ -116,9 +116,11 @@ int RtspReceiveData::receiveData(const std::string &packet) {
 }
 
 
-int RtspReceiveData::disposeRtpData(uint8_t *rtpBuffer, uint32_t rtpBufferSize, uint8_t channel, uint16_t length) {
+int RtspReceiveData::disposeRtpData(uint8_t *rtpBuffer, uint32_t rtpBufferSize, uint8_t channel, uint16_t length,
+                                    std::mutex &mux) {
     int ret;
     if (channel == videoChannel) {
+
         ReadStream rs(rtpBuffer, rtpBufferSize);
         /*获取rtp header*/
         ret = getRtpHeader(rs);
@@ -167,14 +169,16 @@ int RtspReceiveData::disposeRtpData(uint8_t *rtpBuffer, uint32_t rtpBufferSize, 
                 memcpy(nalUintData + nalUintOffset, rs.currentPtr, length);
                 nalUintOffset += length;
                 /*这里还可以依靠mark标记来确定一帧的最后一个slice*/
-                ret = videoReader.test1(picture, nalUintData, nalUintOffset, 4);
+                ret = videoReader.getVideoFrame2(picture, nalUintData, nalUintOffset, 4);
                 if (ret < 0) {
                     fprintf(stderr, "nalReader.getPicture 失败\n");
                     return -1;
                 }
                 if (picture->pictureFinishFlag) {
                     /*获取到完整的一帧,做对应操作*/
+                    // mux.lock();
                     ret = ts.writeTransportStream(picture, packetNumber);
+                    //mux.unlock();
                     if (ret < 0) {
                         fprintf(stderr, "ts.writeVideo 失败\n");
                         return -1;
@@ -192,7 +196,7 @@ int RtspReceiveData::disposeRtpData(uint8_t *rtpBuffer, uint32_t rtpBufferSize, 
             uint8_t *ptr = rs.currentPtr - 5;
             memcpy(ptr, startCode, 4);
             *(ptr + 4) = forbidden_zero_bit << 7 | (nal_ref_idc << 5) | nal_unit_type;
-            ret = videoReader.test1(picture, ptr, length + 5, 4);
+            ret = videoReader.getVideoFrame2(picture, ptr, length + 5, 4);
             if (ret < 0) {
                 fprintf(stderr, "nalReader.getPicture 失败\n");
                 return -1;
@@ -264,7 +268,7 @@ int RtspReceiveData::getRtpHeader(ReadStream &rs) {
 }
 
 int RtspReceiveData::writeVideoData(uint8_t *data, uint8_t size) {
-    return videoReader.test1(picture, data, size, 4);
+    return videoReader.getVideoFrame2(picture, data, size, 4);
 }
 
 int

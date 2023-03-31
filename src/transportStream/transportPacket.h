@@ -93,7 +93,7 @@ private:
 public:
     int init(std::string path);
 
-    int writeTransportStream(const NALPicture *picture, uint32_t &transportStreamPacketNumber);
+    int writeTransportStream(const NALPicture *picture, int &transportStreamPacketNumber);
 
     int writeVideoFrame(const NALPicture *picture);
 

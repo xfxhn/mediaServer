@@ -8,6 +8,7 @@
 #include <string>
 #include <cstring>
 #include <thread>
+#include <mutex>
 
 #include "TcpSocket.h"
 #include "rtpPacket.h"
@@ -39,7 +40,7 @@ struct Info {
     std::string dir;
     SdpInfo sdp;
     /*这个流写入到第几个ts包*/
-    uint32_t transportStreamPacketNumber{0};
+    int transportStreamPacketNumber{0};
 };
 
 class ReadStream;
@@ -114,6 +115,7 @@ private:
 
     //std::vector<uint8_t> pps;
 public:
+
     bool stopFlag{true};
 
     /* bool videoSendError{false};
@@ -133,7 +135,11 @@ public:
 private:
     std::string videoControl;
     std::string audioControl;
+
+    /*这个是当前rtsp流生成的唯一id*/
     std::string uniqueSession;
+    /*这个是拉流的时候要去拉的那个流id*/
+    std::string pullSession;
 
     bool stopVideoSendFlag{true};
     bool stopAudioSendFlag{true};
@@ -163,8 +169,6 @@ private:
 
     static int parseMediaLevel(int i, const std::vector<std::string> &list, SdpInfo &sdpInfo);
 
-    int
-    disposeRtpData(TransportPacket &ts, uint8_t *rtpBuffer, uint32_t rtpBufferSize, uint8_t channel, uint16_t length);
 
     /*instatic t muxTransportStream(uint8_t channel, uint8_t *data, uint32_t size);*/
 

@@ -3,6 +3,7 @@
 #define MUX_ADTSREADER_H
 
 #include <fstream>
+#include "adtsHeader.h"
 #include "demuxPacket.h"
 
 #define TRANSPORT_STREAM_PACKETS_SIZE 188
@@ -14,7 +15,11 @@ class AdtsReader {
 public:
     static constexpr uint32_t MAX_BUFFER_SIZE{8191};
     static constexpr uint32_t MAX_HEADER_SIZE{7};
+
+    // AdtsHeader parameter;
 private:
+    std::string path;
+
     DemuxPacket demux;
     uint8_t transportStreamBuffer[TRANSPORT_STREAM_PACKETS_SIZE];
 
@@ -30,10 +35,12 @@ private:
 
     uint32_t blockBufferSize{0};
     /*已经读取了多少字节*/
-    uint32_t fillByteSize{0};
-    bool isEof{true};
+//    uint32_t fillByteSize{0};
+//    bool isEof{true};
 public:
-    int init(const char *filename);
+//    int init(const char *filename);
+
+    int getAudioParameter(AdtsHeader &parameter);
 
     int init1(const std::string &dir, uint32_t transportStreamPacketNumber);
 
@@ -41,7 +48,7 @@ public:
 
     void reset();
 
-    int getAudioFrame(AdtsHeader &header, bool &flag);
+//    int getAudioFrame(AdtsHeader &header, bool &flag);
 
     int getAudioFrame1(AdtsHeader &header);
 
@@ -52,11 +59,11 @@ public:
 private:
     int getTransportStreamData();
 
-    int adts_sequence(AdtsHeader &header, bool &stopFlag);
-
-    int fillBuffer();
-
-    int advanceBuffer(uint16_t frameLength);
+//    int adts_sequence(AdtsHeader &header, bool &stopFlag);
+//
+//    int fillBuffer();
+//
+//    int advanceBuffer(uint16_t frameLength);
 
 };
 
