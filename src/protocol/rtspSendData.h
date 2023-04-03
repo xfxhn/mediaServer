@@ -1,6 +1,6 @@
 ﻿
-#ifndef RTSP_RTPPACKET_H
-#define RTSP_RTPPACKET_H
+#ifndef RTSP_RTSPSENDDATA_H
+#define RTSP_RTSPSENDDATA_H
 
 #include <cstdint>
 #include "TcpSocket.h"
@@ -70,4 +70,4 @@ private:
 };
 
 
-#endif //RTSP_RTPPACKET_H
+#endif //RTSP_RTSPSENDDATA_H

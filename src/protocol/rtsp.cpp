@@ -4,10 +4,10 @@
 #include <chrono>
 #include "util.h"
 #include "parseUrl.h"
-
+#include "rtspSendData.h"
 #include "rtspReceiveData.h"
-#include "readStream.h"
-#include "writeStream.h"
+#include "adtsReader.h"
+#include "NALReader.h"
 
 
 #define RTP_PAYLOAD_TYPE_H264   96
@@ -15,62 +15,13 @@
 
 
 static std::map<std::string, Info> flowInfo;
-/*当前写到第几个ts包了*/
-//uint32_t transportStreamPacketNumber{0};
-enum {
-    /*多个nalu在一个rtp包*/
-    STAP_A = 24,
-    /*单一时间聚合包*/
-    STAP_B = 25,
-    /*多个时间聚合包 就是可以传输多个nalu，但是编码时间可能不一样*/
-    MTAP_16 = 26,
-    /*多个时间聚合包 */
-    MTAP_24 = 27,
-    /*一个nalu容纳不下，分包*/
-    FU_A = 28,
-    /*第二种分包模式*/
-    FU_B = 29
-};
+
 
 int Rtsp::init(SOCKET socket) {
     clientSocket = socket;
-    //nalUintData = new uint8_t[NALReader::MAX_BUFFER_SIZE];
-
-    // nalReader.init1();
-
-//    aacFrameData = new uint8_t[AdtsReader::MAX_BUFFER_SIZE];
-//    aacHeader = aacFrameData;
-//    aacData = &aacFrameData[7];
-
-//    frame = nalReader.allocPicture();
-//    if (frame == nullptr) {
-//        fprintf(stderr, "获取frame失败\n");
-//        return -1;
-//    }
-    /*fs.open("resource/bbbbbb.aac", std::ios::binary | std::ios::out | std::ios::trunc);
-    if (!fs.is_open()) {
-        fprintf(stderr, "cloud not open %s\n", "resource/bbbbbb.aac");
-        return -1;
-    }*/
     return 0;
 }
 
-int Rtsp::getRtpHeader(ReadStream &rs) {
-    version = rs.readMultiBit(2);
-    padding = rs.readMultiBit(1);
-    extension = rs.readMultiBit(1);
-    if (extension) {
-        fprintf(stderr, "不支持扩展包头\n");
-        return -1;
-    }
-    csrcLen = rs.readMultiBit(4);
-    marker = rs.readMultiBit(1);
-    payloadType = rs.readMultiBit(7);
-    seq = rs.readMultiBit(16);
-    timestamp = rs.readMultiBit(32);
-    ssrc = rs.readMultiBit(32);
-    return 0;
-}
 
 int Rtsp::parseRtsp(std::string &packet, const std::string &data) {
     int ret;
@@ -163,7 +114,7 @@ indexdeltalength=3：表示音频的访问单元索引差值（AU-Index-delta）
 
         //  std::string session;
         /*这个语法是C++ 17的*/
-        for (auto &[key, value]: flowInfo) {
+        for (auto&[key, value]: flowInfo) {
             if (value.dir == urlUtils.getPath()) {
                 pullSession = value.session;
                 dir = value.dir;
@@ -677,205 +628,9 @@ int Rtsp::receiveData(std::string &packet, const std::string &session) const {
         return ret;
     }
 
-    /*TransportPacket ts;
-    *//*接收rtsp数据，存为ts*//*
-    ts.init("test/");
-
-    *//*一个rtp包最大大小不会超过16个bit也就是65535*//*
-    uint8_t *buffer = new uint8_t[65535]; // NOLINT(modernize-use-auto)
-    // todo delete buffer
-    *//*packet这里面有可能还有剩余的字节没读取完*//*
-    memcpy(buffer, packet.c_str(), packet.length());
-    uint32_t bufferSize = packet.length();
-
-    uint8_t *rtpBuffer = nullptr;
-    uint32_t rtpBufferSize = 0;
-
-    int size = 0;
-    while (true) {
-        if (bufferSize < 4) {
-            ret = TcpSocket::receive(clientSocket, (char *) buffer + bufferSize, size);
-            if (ret < 0) {
-                fprintf(stderr, "TcpSocket::receive 失败\n");
-                return ret;
-            }
-            bufferSize += size;
-            *//*这里跳过这个循环，因为有可能，还取不到四个字节数据*//*
-            continue;
-        }
-        uint8_t magic = buffer[0];
-        if (magic != '$') {
-            fprintf(stderr, "读取错误，没找到分隔符\n");
-            return -1;
-        }
-        uint8_t channel = buffer[1];
-        *//*这个rtp包剩余数据大小*//*
-        uint16_t length = buffer[2] << 8 | buffer[3];
-
-        rtpBuffer = buffer + 4;
-        rtpBufferSize = bufferSize - 4;
-        while (true) {
-            if (rtpBufferSize < length) {
-                *//*不够rtp包大小继续取数据，直到取到为止*//*
-                ret = TcpSocket::receive(clientSocket, (char *) (rtpBuffer + rtpBufferSize), size);
-                if (ret < 0) {
-                    fprintf(stderr, "TcpSocket::receive 失败\n");
-                    return ret;
-                }
-                rtpBufferSize += size;
-            } else {
-                *//*处理数据*//*
-                ret = disposeRtpData(ts, rtpBuffer, rtpBufferSize, channel, length);
-                if (ret < 0) {
-                    fprintf(stderr, "处理rtp包失败\n");
-                    return ret;
-                }
-                rtpBufferSize -= length;
-                *//*这里不用使用memmove,不会发生内存重叠*//*
-                memcpy(buffer, rtpBuffer + length, rtpBufferSize);
-                bufferSize = rtpBufferSize;
-                break;
-            }
-        }
-    }*/
-
 
     return 0;
 }
-
-static constexpr uint8_t startCode[4] = {0, 0, 0, 1};
-
-/*int Rtsp::disposeRtpData(TransportPacket &ts, uint8_t *rtpBuffer, uint32_t rtpBufferSize, uint8_t channel,
-                         uint16_t length) {
-    int ret;
-    if (channel == videoChannel) {
-        ReadStream rs(rtpBuffer, rtpBufferSize);
-        *//*获取rtp header*//*
-        ret = getRtpHeader(rs);
-        if (ret < 0) {
-            return ret;
-        }
-        length -= 12;
-
-        uint8_t forbidden_zero_bit = rs.readMultiBit(1);
-        uint8_t nal_ref_idc = rs.readMultiBit(2);
-        uint8_t nal_unit_type = rs.readMultiBit(5);
-        length -= 1;
-        if (nal_unit_type == STAP_A) {
-            printf("STAP_A\n");
-            return -1;
-        } else if (nal_unit_type == STAP_B) {
-            printf("STAP_B\n");
-            return -1;
-        } else if (nal_unit_type == MTAP_16) {
-            printf("MTAP_16\n");
-            return -1;
-        } else if (nal_unit_type == MTAP_24) {
-            printf("MTAP_24\n");
-            return -1;
-        } else if (nal_unit_type == FU_A) {
-            *//**//*
-            uint8_t start = rs.readMultiBit(1);
-            uint8_t end = rs.readMultiBit(1);
-            *//*reserved = 0*//*
-            rs.readMultiBit(1);
-
-            nal_unit_type = rs.readMultiBit(5);
-            length -= 1;
-
-
-            if (start == 1 && end == 0) {
-                *(rs.currentPtr - 1) = forbidden_zero_bit << 7 | (nal_ref_idc << 5) | nal_unit_type;
-                *//*这里手动给nalu加上起始码，固定0001*//*
-                memcpy(nalUintData, startCode, 4);
-                memcpy(nalUintData + 4, rs.currentPtr - 1, length + 1);
-                nalUintOffset = 4 + length + 1;
-            } else if (start == 0 && end == 0) {
-                memcpy(nalUintData + nalUintOffset, rs.currentPtr, length);
-                nalUintOffset += length;
-            } else if (start == 0 && end == 1) {
-                memcpy(nalUintData + nalUintOffset, rs.currentPtr, length);
-                nalUintOffset += length;
-                *//*这里还可以依靠mark标记来确定一帧的最后一个slice*//*
-                ret = nalReader.test1(frame, nalUintData, nalUintOffset, 4);
-                if (ret < 0) {
-                    fprintf(stderr, "nalReader.getPicture 失败\n");
-                    return -1;
-                }
-                if (frame->pictureFinishFlag) {
-                    *//*获取到完整的一帧,做对应操作*//*
-                    // ret = ts.writeTransportStream(frame, transportStreamPacketNumber);
-                    if (ret < 0) {
-                        fprintf(stderr, "ts.writeVideo 失败\n");
-                        return -1;
-                    }
-                }
-            } else {
-                fprintf(stderr, "start = %d 和 end = %d 有问题\n", start, end);
-                return -1;
-            }
-        } else if (nal_unit_type == FU_B) {
-            printf("FU_B\n");
-            return -1;
-        } else {
-
-            uint8_t *ptr = rs.currentPtr - 5;
-            memcpy(ptr, startCode, 4);
-            *(ptr + 4) = forbidden_zero_bit << 7 | (nal_ref_idc << 5) | nal_unit_type;
-            ret = nalReader.test1(frame, ptr, length + 5, 4);
-            if (ret < 0) {
-                fprintf(stderr, "nalReader.getPicture 失败\n");
-                return -1;
-            }
-
-
-            if (frame->pictureFinishFlag) {
-//                ret = ts.writeTransportStream(frame, transportStreamPacketNumber);
-                if (ret < 0) {
-                    fprintf(stderr, "ts.writeVideo 失败\n");
-                    return -1;
-                }
-            }
-
-        }
-    } else if (channel == audioChannel) {
-        //  printf("audiochanggel\n");
-        ReadStream rs(rtpBuffer, rtpBufferSize);
-        *//*获取rtp header*//*
-        ret = getRtpHeader(rs);
-        if (ret < 0) {
-            return ret;
-        }
-
-        uint16_t headerLength = rs.readMultiBit(16) / 16;
-
-        std::vector<uint16_t> sizeList;
-        for (int i = 0; i < headerLength; ++i) {
-            uint16_t sizeLength = rs.readMultiBit(13);
-            uint8_t indexDelta = rs.readMultiBit(3);
-            sizeList.push_back(sizeLength);
-        }
-        for (uint16_t aacSize: sizeList) {
-            AdtsHeader::setFrameLength(aacSize + 7);
-            memcpy(rs.currentPtr - 7, AdtsHeader::header, 7);
-
-            adtsReader.disposeAudio(adtsHeader, rs.currentPtr - 7, aacSize + 7);
-
-            ret = ts.writeAudioFrame(adtsHeader);
-            if (ret < 0) {
-                fprintf(stderr, "写入音频失败\n");
-                return -1;
-            }
-            rs.setBytePtr(aacSize);
-        }
-
-
-    } else {
-        printf("rtcp channel = %d\n", channel);
-    }
-
-    return 0;
-}*/
 
 
 /*发送音频和视频的函数*/
@@ -903,25 +658,8 @@ int Rtsp::sendVideo(uint32_t number) {
     std::chrono::time_point<std::chrono::high_resolution_clock> start;
     while (stopVideoSendFlag) {
         start = std::chrono::high_resolution_clock::now();
-        ret = reader.getVideoFrame1(picture);
-        if (ret < 0) {
-            fprintf(stderr, "获取视频数据失败\n");
-            stopFlag = false;
-            return ret;
-        }
-        videoPacket.timestamp = picture->dts;
-        for (int i = 0; i < picture->data.size(); ++i) {
-            const Frame &nalUint = picture->data[i];
-            ret = videoPacket.sendVideoFrame(clientSocket, nalUint.data, nalUint.nalUintSize,
-                                             i == (picture->data.size() - 1), videoChannel);
-            if (ret < 0) {
-                fprintf(stderr, "发送视频数据失败\n");
-                stopFlag = false;
-                return ret;
-            }
-        }
-        /*一次发送一秒数据过去*/
-        while (idx++ < picture->sliceHeader.sps.fps && stopVideoSendFlag) {
+
+        while (idx++ < 8 && stopVideoSendFlag) {
             ret = reader.getVideoFrame1(picture);
             if (ret < 0) {
                 fprintf(stderr, "获取视频数据失败\n");
@@ -943,89 +681,13 @@ int Rtsp::sendVideo(uint32_t number) {
         idx = 0;
         elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
                 std::chrono::high_resolution_clock::now() - start);
-        //printf("运行了多久 %d\n", elapsed.count());
-        std::this_thread::sleep_for(std::chrono::milliseconds(1000 - elapsed.count()));
+        // picture->sliceHeader.sps.fps;
+        //fprintf(stderr, "运行了多久 %d\n", elapsed.count());
+        std::this_thread::sleep_for(std::chrono::milliseconds(picture->interval * 8 - elapsed.count()));
     }
 
-
-
-
-
-
-
     /* todo  这里父线程终止，当前线程也应该退出，释放资源，等会儿做 */
-//    std::chrono::duration<int, std::micro> elapsed{};
-//    auto lastTime = std::chrono::high_resolution_clock::now();
-//    /*这里如果父线程退出的话，这里自然会退出，但是如果是子线程出错，想要退出并且关闭这个tcp链接*/
-//    while (stopVideoSendFlag) {
-//        ret = reader.getVideoFrame1(picture);
-//        if (ret < 0) {
-//            fprintf(stderr, "获取视频数据失败\n");
-//            stopFlag = false;
-//            return ret;
-//        }
-//        videoPacket.timestamp = picture->dts;
-//        for (int i = 0; i < picture->data.size(); ++i) {
-//            const Frame &nalUint = picture->data[i];
-//            ret = videoPacket.sendVideoFrame(clientSocket, nalUint.data, nalUint.nalUintSize,
-//                                             i == (picture->data.size() - 1), videoChannel);
-//            if (ret < 0) {
-//                fprintf(stderr, "发送视频数据失败\n");
-//                stopFlag = false;
-//                return ret;
-//            }
-//        }
-//
-//        elapsed = std::chrono::duration_cast<std::chrono::microseconds>(
-//                std::chrono::high_resolution_clock::now() - lastTime);
-//
-//        //  std::this_thread::sleep_for(std::chrono::microseconds(picture->interval - elapsed.count() - 9000));
-//        std::this_thread::sleep_for(std::chrono::microseconds(picture->interval - elapsed.count()));
-//
-//        lastTime = std::chrono::high_resolution_clock::now();
-//    }
-    /*  RtpPacket videoPacket;
-      videoPacket.init(NALReader::MAX_BUFFER_SIZE, RTP_PAYLOAD_TYPE_H264);
 
-
-      bool flag = true;
-
-      NALReader reader;
-      ret = reader.init("");
-      if (ret < 0) {
-          fprintf(stderr, "init video failed\n");
-          videoSendError = true;
-          return ret;
-      }
-
-      NALPicture *picture = reader.allocPicture();
-      while (flag) {
-          ret = reader.getVideoFrame(picture, flag);
-          if (ret < 0) {
-              fprintf(stderr, "获取视频帧失败\n");
-              videoSendError = true;
-              return ret;
-          }
-
-          for (int i = 0; i < picture->data.size(); ++i) {
-              const Frame &nalUint = picture->data[i];
-
-              ret = videoPacket.sendVideoFrame(clientSocket, nalUint.data, nalUint.nalUintSize,
-                                               i == (picture->data.size() - 1), videoChannel);
-              if (ret < 0) {
-                  fprintf(stderr, "发送视频数据失败\n");
-                  videoSendError = true;
-                  return ret;
-              }
-
-          }
-          // printf("pts = %lld\n", picture->pts);
-          videoPacket.timestamp = picture->pts;
-
-
-          std::this_thread::sleep_for(std::chrono::milliseconds(40 - 20));
-      }
-      printf("视频发送完成\n");*/
     return 0;
 }
 
@@ -1044,36 +706,15 @@ int Rtsp::sendAudio(uint32_t number) {
 
 
     AdtsHeader header;
-//    ret = reader.getAudioParameter(header);
-//    if (ret < 0) {
-//        fprintf(stderr, "获取音频参数失败\n");
-//        return ret;
-//    }
 
-
-    uint32_t fps;
     uint32_t idx = 0;
+
     std::chrono::duration<int, std::milli> elapsed{};
     std::chrono::time_point<std::chrono::high_resolution_clock> start;
     while (stopAudioSendFlag) {
         start = std::chrono::high_resolution_clock::now();
 
-        ret = reader.getAudioFrame1(header);
-        if (ret < 0) {
-            fprintf(stderr, "获取audio frame失败\n");
-            return ret;
-        }
-        audioPacket.timestamp = header.dts;
-        /*这里是把音频数据发出去*/
-        ret = audioPacket.sendAudioPacket(clientSocket, header.data, header.size, audioChannel);
-        if (ret < 0) {
-            fprintf(stderr, "发送音频包失败\n");
-            //  audioSendError = true;
-            return ret;
-        }
-        /*得到一秒几帧*/
-        fps = header.sample_rate / 1024;
-        while (idx++ < fps && stopAudioSendFlag) {
+        while (idx++ < 10 && stopAudioSendFlag) {
             /*这里是获取一帧音频数据*/
             ret = reader.getAudioFrame1(header);
             if (ret < 0) {
@@ -1088,92 +729,24 @@ int Rtsp::sendAudio(uint32_t number) {
                 //  audioSendError = true;
                 return ret;
             }
-
         }
         idx = 0;
+
+
         elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
                 std::chrono::high_resolution_clock::now() - start);
-        //printf("运行了多久 %d\n", elapsed.count());
-        std::this_thread::sleep_for(std::chrono::milliseconds(1000 - elapsed.count()));
+        std::this_thread::sleep_for(std::chrono::milliseconds((header.interval * 10) - elapsed.count() - 2));
     }
 
-
-
-//    std::chrono::duration<int, std::micro> elapsed{};
-//    auto lastTime = std::chrono::high_resolution_clock::now();
-//
-//    /*如果是44100的采样率，一秒钟就有43帧，那么我可以一次性发送43帧，然后间隔一秒再去发送43帧*/
-//    while (stopAudioSendFlag) {
-//        /*这里是获取一帧音频数据*/
-//        ret = reader.getAudioFrame1(header);
-//        if (ret < 0) {
-//            fprintf(stderr, "获取audio frame失败\n");
-//            return ret;
-//        }
-//        audioPacket.timestamp = header.dts;
-//        /*这里是把音频数据发出去*/
-//        ret = audioPacket.sendAudioPacket(clientSocket, header.data, header.size, audioChannel);
-//        if (ret < 0) {
-//            fprintf(stderr, "发送音频包失败\n");
-//            //  audioSendError = true;
-//            return ret;
-//        }
-//
-//        /*当前时间减去上个时间*/
-//        elapsed = std::chrono::duration_cast<std::chrono::microseconds>(
-//                std::chrono::high_resolution_clock::now() - lastTime);
-//
-//        // std::this_thread::sleep_for(std::chrono::microseconds(header.interval - elapsed.count() - 8100));
-//        std::this_thread::sleep_for(std::chrono::microseconds(header.interval - elapsed.count()));
-//        /*记录下上一帧发送完的时间*/
-//        lastTime = std::chrono::high_resolution_clock::now();
-//    }
     return 0;
-    /* int ret;
-
-     RtpPacket audioPacket;
-     audioPacket.init(AdtsReader::MAX_BUFFER_SIZE, RTP_PAYLOAD_TYPE_AAC);
-
-     AdtsReader reader;
-     ret = reader.init("");
-     if (ret < 0) {
-         fprintf(stderr, "init audio failed\n");
-         // audioSendError = true;
-         return ret;
-     }
-
-
-     AdtsHeader header;
-     bool flag = true;
-     while (flag) {
-         ret = reader.getAudioFrame(header, flag);
-         if (ret < 0) {
-             fprintf(stderr, "获取audio frame失败\n");
-             //   audioSendError = true;
-             return ret;
-         }
-         ret = audioPacket.sendAudioPacket(clientSocket, header.data, header.size, audioChannel);
-         if (ret < 0) {
-             fprintf(stderr, "发送音频包失败\n");
-             //  audioSendError = true;
-             return ret;
-         }
-
-         audioPacket.timestamp += 1024;
-         if (audioPacket.timestamp >= 4294967295) {
-             audioPacket.timestamp = 0;
-         }
-         std::this_thread::sleep_for(std::chrono::milliseconds(10));
-     }
-     printf("音频发送完成\n");
-     return 0;*/
 }
+
+static constexpr uint8_t startCode[4] = {0, 0, 0, 1};
 
 int Rtsp::parseSdp(const std::string &sdp, SdpInfo &sdpInfo) {
     int ret;
     std::vector<std::string> list = split(sdp, "\r\n");
 
-    //std::map<std::string, std::string> obj;
     for (int i = 0; i < list.size(); ++i) {
         const std::string &line = list[i];
 
@@ -1247,8 +820,7 @@ int Rtsp::parseMediaLevel(int i, const std::vector<std::string> &list, SdpInfo &
                             std::map<std::string, std::string> obj = getObj(split(right, ";"), "=");
                             std::vector<std::string> sps_pps = split(obj["sprop-parameter-sets"], ",");
 
-                            // uint8_t sps[50];
-                            /* todo 等会儿删除 */
+
                             memcpy(sdpInfo.spsData, startCode, 4);
                             ret = base64_decode(sps_pps[0], sdpInfo.spsData + 4);
                             if (ret < 0) {
@@ -1256,14 +828,7 @@ int Rtsp::parseMediaLevel(int i, const std::vector<std::string> &list, SdpInfo &
                                 return ret;
                             }
                             sdpInfo.spsSize = ret + 4;
-                            //                            spsSize = ret;
-//                            ret = nalReader.test1(frame, sps, ret + 4, 4);
-//                            if (ret < 0) {
-//                                fprintf(stderr, "nalReader.getPicture 失败\n");
-//                                return -1;
-//                            }
 
-                            // uint8_t pps[50];
                             memcpy(sdpInfo.ppsData, startCode, 4);
                             ret = base64_decode(sps_pps[1], sdpInfo.ppsData + 4);
                             if (ret < 0) {
@@ -1271,12 +836,6 @@ int Rtsp::parseMediaLevel(int i, const std::vector<std::string> &list, SdpInfo &
                                 return ret;
                             }
                             sdpInfo.ppsSize = ret + 4;
-                            //                            ppsSize = ret;
-//                            ret = nalReader.test1(frame, pps, ret + 4, 4);
-//                            if (ret < 0) {
-//                                fprintf(stderr, "nalReader.getPicture 失败\n");
-//                                return -1;
-//                            }
                         } else {
                             fprintf(stderr, "解析错误\n");
                             return -1;
@@ -1388,10 +947,9 @@ int Rtsp::parseAACConfig(const std::string &config, SdpInfo &sdpInfo) {
 
 Rtsp::~Rtsp() {
     printf("~Rtsp 析构\n");
-
+    std::filesystem::remove_all(flowInfo[uniqueSession].dir);
     flowInfo.erase(uniqueSession);
 
-    std::filesystem::remove_all(flowInfo[uniqueSession].dir);
 
     stopVideoSendFlag = false;
     stopAudioSendFlag = false;

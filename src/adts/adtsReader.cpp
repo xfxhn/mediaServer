@@ -66,19 +66,6 @@ void AdtsReader::reset() {
     audioDecodeFrameNumber = 0;
 }
 
-int AdtsReader::getAudioParameter(AdtsHeader &parameter) {
-    // AdtsHeader parameter;
-    int ret;
-    ret = findFrame(parameter);
-    if (ret < 0) {
-        fprintf(stderr, "findFrame失败\n");
-        return -1;
-    }
-    disposeAudio(parameter, parameter.data, parameter.size);
-    reset();
-    return 0;
-}
-
 
 int AdtsReader::findFrame(AdtsHeader &header) {
     int ret;
@@ -134,95 +121,6 @@ int AdtsReader::findFrame(AdtsHeader &header) {
     return 0;
 }
 
-//int AdtsReader::adts_sequence(AdtsHeader &header, bool &stopFlag) {
-//    int ret;
-//    if (!buffer) {
-//        fprintf(stderr, "请初始化\n");
-//        return -1;
-//    }
-//
-//    fillBuffer();
-//    if (blockBufferSize > MAX_HEADER_SIZE) {
-//        ReadStream bs(buffer, MAX_BUFFER_SIZE);
-//        if (bs.getMultiBit(12) != 0xFFF) {
-//            stopFlag = false;
-//            fprintf(stderr, "格式不对,不等于0xFFF\n");
-//            return -1;
-//        }
-//        /*读取每一帧的ADTS头*/
-//
-//        ret = header.adts_fixed_header(bs);
-//        if (ret < 0) {
-//            stopFlag = false;
-//            fprintf(stderr, "解析adts fixed header失败\n");
-//            return -1;
-//        }
-//        header.adts_variable_header(bs);
-//
-//        uint16_t frameLength = header.frame_length;
-//
-//        /*如果这一帧的长度等于0或者大于filesize的话就退出，数据不对*/
-//        if (frameLength == 0 || frameLength > blockBufferSize) {
-//            stopFlag = false;
-//            fprintf(stderr, "AAC data 数据不对\n");
-//            return -1;
-//        }
-//        header.data = &buffer[MAX_HEADER_SIZE];
-//        header.size = frameLength - MAX_HEADER_SIZE;
-//
-//        advanceBuffer(frameLength);
-//    } else {
-//        fillByteSize = 0;
-//        stopFlag = false;
-//    }
-//
-//    return 0;
-//}
-//
-//int AdtsReader::fillBuffer() {
-//    if (fillByteSize > 0) {
-//        if (blockBufferSize) {
-//            //由src所指内存区域复制count个字节到dest所指内存区域。
-//            memmove(buffer, (buffer + fillByteSize), blockBufferSize);
-//        }
-//
-//        if (isEof) {
-//            fs.read(reinterpret_cast<char *>(buffer + blockBufferSize), fillByteSize);
-//            uint32_t size = fs.gcount();
-//
-//            /*如果读不满 fillByteSize 大小代表读到尾部了size是实际读取了多大*/
-//            if (size != fillByteSize) {
-//                isEof = false;
-//            }
-//            blockBufferSize += size;
-//        }
-//        fillByteSize = 0;
-//    }
-//    return 0;
-//}
-//
-//int AdtsReader::advanceBuffer(uint16_t length) {
-//    if (length > 0 && blockBufferSize > 0) {
-//        uint32_t size = min(length, blockBufferSize);
-//        fillByteSize += size;
-//        blockBufferSize -= size;
-//    }
-//    return 0;
-//}
-//
-//int AdtsReader::getAudioFrame(AdtsHeader &header, bool &flag) {
-//    int ret;
-//    ret = adts_sequence(header, flag);
-//    if (ret < 0) {
-//        fprintf(stderr, "解析adts_sequence 失败\n");
-//        return ret;
-//    }
-//    header.duration += (1024.0 / header.sample_rate);
-//    header.dts = av_rescale_q(audioDecodeFrameNumber, {1, static_cast<int>(header.sample_rate)}, {1, 1000});
-//    header.pts = header.dts;
-//    audioDecodeFrameNumber += 1024;
-//    return 0;
-//}
 
 int AdtsReader::getAudioFrame1(AdtsHeader &header) {
     int ret;
@@ -250,18 +148,18 @@ void AdtsReader::disposeAudio(AdtsHeader &header, uint8_t *data, uint32_t size) 
     header.dts = audioDecodeFrameNumber;
     header.pts = av_rescale_q(audioDecodeFrameNumber, {1, static_cast<int>(header.sample_rate)}, {1, 1000});
     /*转换成微秒*/
-    header.interval = (int) (1024.0 / (double) header.sample_rate * 1000000.0);
+    header.interval = (int) (1024.0 / (double) header.sample_rate * 1000.0);
     audioDecodeFrameNumber += 1024;
 }
 
 int AdtsReader::getTransportStreamData() {
     int ret;
     std::string name;
-    uint8_t offset = 0;
-    uint32_t size;
+    //uint8_t offset = 0;
+    uint32_t size = 0;
     while (true) {
-        fs.read(reinterpret_cast<char *>(transportStreamBuffer + offset), TRANSPORT_STREAM_PACKETS_SIZE - offset);
-        size = fs.gcount() + offset;
+        fs.read(reinterpret_cast<char *>(transportStreamBuffer + size), TRANSPORT_STREAM_PACKETS_SIZE - size);
+        size += fs.gcount();
         if (size == 0) {
             uint32_t pos = fs.tellg();
             /*表示这个文件读完了，读下一个*/
@@ -276,7 +174,7 @@ int AdtsReader::getTransportStreamData() {
                 fs.open(path + name, std::ios::out | std::ios::binary);
                 /*返回到上次读取到的位置*/
                 fs.seekg(pos);
-                std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+                std::this_thread::sleep_for(std::chrono::milliseconds(200));
                 continue;
             }
 
@@ -288,31 +186,14 @@ int AdtsReader::getTransportStreamData() {
             }
         } else if (size < TRANSPORT_STREAM_PACKETS_SIZE) {
             fs.clear();
-            fprintf(stderr, "size < TRANSPORT_STREAM_PACKETS_SIZE %d,  audio\n", size);
-            offset = size;
-            std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+            fprintf(stderr, "size < TRANSPORT_STREAM_PACKETS_SIZE %d,  audio currentPacket = %d\n", size,
+                    currentPacket);
+            // offset = size;
+            std::this_thread::sleep_for(std::chrono::milliseconds(200));
             continue;
         }
 
-        /*if (size != TRANSPORT_STREAM_PACKETS_SIZE) {
-            *//*表示这个文件读完了，读下一个*//*
-            *//*这里ts文件，应该就是188的倍数，不是188的倍数，这个文件是有问题*//*
-            fs.close();
-            std::string name = "/test" + std::to_string(++currentPacket) + ".ts";
-            printf("读取%s文件 audio\n", name.c_str());
-            fs.open(path + name, std::ios::out | std::ios::binary);
-            if (!fs.is_open()) {
-                fprintf(stderr, "open %s failed audio\n", name.c_str());
-                return -1;
-            }
 
-            fs.read(reinterpret_cast<char *>(transportStreamBuffer), TRANSPORT_STREAM_PACKETS_SIZE);
-            size = fs.gcount();
-            if (size != TRANSPORT_STREAM_PACKETS_SIZE) {
-                fprintf(stderr, "没读到一个ts包的大小，read size = %d\n", size);
-                return -1;
-            }
-        }*/
         ReadStream rs(transportStreamBuffer, size);
         ret = demux.readFrame(rs);
         if (ret < 0) {
@@ -326,7 +207,7 @@ int AdtsReader::getTransportStreamData() {
             bufferEnd = buffer + blockBufferSize;
             break;
         }
-
+        size = 0;
     }
 
     return 0;

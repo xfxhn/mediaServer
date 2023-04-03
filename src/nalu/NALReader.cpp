@@ -64,11 +64,11 @@ int NALReader::init1(const std::string &dir, uint32_t transportStreamPacketNumbe
 int NALReader::getTransportStreamData() {
     int ret;
     std::string name;
-    uint8_t offset = 0;
-    uint32_t size;
+    //uint8_t offset = 0;
+    uint32_t size = 0;
     while (true) {
-        fs.read(reinterpret_cast<char *>(transportStreamBuffer + offset), TRANSPORT_STREAM_PACKETS_SIZE - offset);
-        size = fs.gcount() + offset;
+        fs.read(reinterpret_cast<char *>(transportStreamBuffer + size), TRANSPORT_STREAM_PACKETS_SIZE - size);
+        size += fs.gcount();
         if (size == 0) {
             uint32_t pos = fs.tellg();
             /*表示这个文件读完了，读下一个*/
@@ -83,7 +83,7 @@ int NALReader::getTransportStreamData() {
                 fs.open(path + name, std::ios::out | std::ios::binary);
                 /*返回到上次读取到的位置*/
                 fs.seekg(pos);
-                std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+                std::this_thread::sleep_for(std::chrono::milliseconds(200));
                 continue;
             }
 
@@ -96,12 +96,10 @@ int NALReader::getTransportStreamData() {
         } else if (size < TRANSPORT_STREAM_PACKETS_SIZE) {
             fs.clear();
             fprintf(stderr, "size < TRANSPORT_STREAM_PACKETS_SIZE %d, video\n", size);
-            offset = size;
-            std::this_thread::sleep_for(std::chrono::milliseconds(1200));
+            std::this_thread::sleep_for(std::chrono::milliseconds(200));
             continue;
         }
         /*走到这里肯定有188个字节*/
-        offset = 0;
         ReadStream rs(transportStreamBuffer, size);
         ret = demux.readFrame(rs);
         if (ret < 0) {
@@ -115,7 +113,7 @@ int NALReader::getTransportStreamData() {
             bufferEnd = bufferStart + blockBufferSize;
             break;
         }
-
+        size = 0;
     }
 
     return 0;
@@ -726,7 +724,7 @@ void NALReader::computedTimestamp(NALPicture *picture) {
     picture->dts = av_rescale_q(videoDecodeFrameNumber, picture->sliceHeader.sps.timeBase, {1, clockRate});
     picture->pcr = av_rescale_q(videoDecodeFrameNumber, picture->sliceHeader.sps.timeBase, {1, clockRate});
     /*转换成微秒*/
-    picture->interval = 1000000 / (int) picture->sliceHeader.sps.fps;
+    picture->interval = 1000 / (int) picture->sliceHeader.sps.fps;
     picture->duration = (double) videoDecodeFrameNumber / picture->sliceHeader.sps.fps;
     ++videoDecodeFrameNumber;
 }

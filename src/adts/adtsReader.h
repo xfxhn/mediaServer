@@ -16,7 +16,6 @@ public:
     static constexpr uint32_t MAX_BUFFER_SIZE{8191};
     static constexpr uint32_t MAX_HEADER_SIZE{7};
 
-    // AdtsHeader parameter;
 private:
     std::string path;
 
@@ -40,15 +39,12 @@ private:
 public:
 //    int init(const char *filename);
 
-    int getAudioParameter(AdtsHeader &parameter);
 
     int init1(const std::string &dir, uint32_t transportStreamPacketNumber);
 
     int findFrame(AdtsHeader &header);
 
     void reset();
-
-//    int getAudioFrame(AdtsHeader &header, bool &flag);
 
     int getAudioFrame1(AdtsHeader &header);
 
