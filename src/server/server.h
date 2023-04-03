@@ -9,11 +9,15 @@
 
 class Server {
 private:
+    bool stopFlag{true};
+    std::thread *rtspThread;
+    std::thread *httpThread;
     TcpSocket rtsp;
+    TcpSocket http;
     /*AnalysisData ad;*/
 
-    const char *videoFilename{""};
-    const char *audioFilename{""};
+//    const char *videoFilename{""};
+//    const char *audioFilename{""};
 
     //    NALReader videoReader;
     //AdtsReader audioReader;
@@ -32,6 +36,14 @@ public:
 
 
     int start();
+
+    ~Server();
+
+private:
+
+    int startRtspServer();
+
+    int startHttpServer();
 
 
 };

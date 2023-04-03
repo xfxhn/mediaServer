@@ -25,13 +25,7 @@ int ThreadPool::start() {
     return 0;
 }
 
-ThreadPool::~ThreadPool() {
-    for (auto &th: threads) {
-        delete th;
-    }
 
-    threads.clear();
-}
 
 int ThreadPool::addTask(Task *task) {
     std::unique_lock<std::mutex> lock(mutex);
@@ -98,6 +92,12 @@ void ThreadPool::stop() {
     for (std::thread *th: threads) {
         th->join();
     }
+}
 
+ThreadPool::~ThreadPool() {
+    for (auto &th: threads) {
+        delete th;
+    }
 
+    threads.clear();
 }

@@ -21,75 +21,6 @@ public:
     }
 
 
-
-    //    int initVideo(const char *filename) {
-    //        int ret;
-    //        videoFilename = filename;
-    //        NALReader reader;
-    //        ret = reader.init(filename);
-    //        if (ret < 0) {
-    //            fprintf(stderr, "init video failed\n");
-    //            return ret;
-    //        }
-    //
-    //        uint32_t spsSize = 0;
-    //        uint32_t ppsSize = 0;
-    //        ret = reader.getSpsAndPps(spsSize, ppsSize);
-    //        if (ret < 0) {
-    //            fprintf(stderr, "获取sps和pps失败\n");
-    //            return ret;
-    //        }
-    //
-    //        /*这里传输了SPS和PPS，其实可以在传输数据的时候不带SPS和PPS*/
-    //        ad.sprop_parameter_sets = GenerateSpropParameterSets(reader.spsData, spsSize, reader.ppsData, ppsSize);
-    //
-    //        ad.profileLevelId += decimalToHex(reader.sps.profile_idc);
-    //        ad.profileLevelId += decimalToHex(reader.sps.compatibility);
-    //        ad.profileLevelId += decimalToHex(reader.sps.level_idc);
-    //
-    //
-    //        videoPacket.init(NALReader::MAX_BUFFER_SIZE, RTP_PAYLOAD_TYPE_H264);
-    //        return ret;
-    //    }
-    //
-    //    int initAudio(const char *filename) {
-    //        int ret;
-    //        audioFilename = filename;
-    //        AdtsReader reader;
-    //        ret = reader.init(filename);
-    //        if (ret < 0) {
-    //            fprintf(stderr, "init audio failed\n");
-    //            return ret;
-    //        }
-    //
-    //        bool flag = true;
-    //        ret = reader.getAudioFrame(ad.header, flag);
-    //        if (ret < 0) {
-    //            fprintf(stderr, "获取audio frame失败\n");
-    //            return ret;
-    //        }
-    //
-    //        //aacConfig 大小
-    //        constexpr int size = 2;
-    //        uint8_t buffer[size];
-    //        WriteStream ws(buffer, size);
-    //
-    //        AudioSpecificConfig AACConfig;
-    //        ret = AACConfig.setConfig(ad.header.ID == 1 ? ad.header.profile + 1 : ad.header.profile,
-    //                                  ad.header.sampling_frequency_index,
-    //                                  ad.header.channel_configuration);
-    //        if (ret < 0) {
-    //            return ret;
-    //        }
-    //
-    //        AACConfig.write(ws);
-    //        for (uint8_t i: buffer) {
-    //            ad.aacConfig += decimalToHex(i);
-    //        }
-    //        audioPacket.init(AdtsReader::MAX_BUFFER_SIZE, RTP_PAYLOAD_TYPE_AAC);
-    //        return 0;
-    //    }
-
     /*多个不同请求   比如有rtsp 和 http*/
     int run() override {
         int ret;
@@ -112,19 +43,7 @@ public:
                 return ret;
             }
 
-            /*视频发送错误了，退出这个线程*/
-//            if (rtsp.videoSendError) {
-//                /*主动关闭tcp链接*/
-//                //TcpSocket::closeSocket(clientSocket);
-//                fprintf(stderr, "视频发送错误\n");
-//                return -1;
-//            }
-//            if (rtsp.audioSendError) {
-//                /*主动关闭tcp链接*/
-//                //TcpSocket::closeSocket(clientSocket);
-//                fprintf(stderr, "音频发送错误\n");
-//                return -1;
-//            }
+
             // 将缓冲区中的数据添加到字符串对象中
             packet.append(buffer, length);
             // 查找分隔符在字符串中的位置
