@@ -2,6 +2,9 @@
 cmake-build-debug-mingw
 cmake-build-debug
 .vs
+build
+.vscode
 out
 CMakeSettings.json
 /resource
+.DS_Store
