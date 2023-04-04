@@ -62,7 +62,6 @@ int Rtsp::parseRtsp(std::string &packet, const std::string &data) {
                                   static_cast<int>(strlen(responseBuffer)));
         if (ret < 0) {
             fprintf(stderr, "发送数据失败 -> option\n");
-
             return ret;
         }
     } else if (strcmp(method, "DESCRIBE") == 0) {
@@ -250,7 +249,7 @@ indexdeltalength=3：表示音频的访问单元索引差值（AU-Index-delta）
 
                     Info info;
                     info.session = uniqueSession;
-                    info.dir = urlUtils.getPath();
+                    info.dir = "." + urlUtils.getPath();
                     ret = parseSdp(sdp, info.sdp);
                     if (ret < 0) {
                         sprintf(responseBuffer,

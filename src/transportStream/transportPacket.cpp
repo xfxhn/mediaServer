@@ -33,7 +33,6 @@ int TransportPacket::init(std::string path) {
     std::filesystem::create_directories(dir);
 
 
-
     buffer = new uint8_t[TRANSPORT_STREAM_PACKETS_SIZE];
     ws = new WriteStream(buffer, TRANSPORT_STREAM_PACKETS_SIZE);
 
@@ -54,12 +53,12 @@ int TransportPacket::writeTransportStream(const NALPicture *picture, int &transp
         audioPacketSize = 0;
         transportStreamFileSystem.close();
 
-        std::string name = "/test" + std::to_string(transportStreamPacketNumber++) + ".ts";
+        std::string name = "test" + std::to_string(transportStreamPacketNumber++) + ".ts";
         printf("写入%s文件\n", name.c_str());
         /*当前的时间减去上个切片的时间*/
         double duration = picture->duration - lastDuration;
         list.push_back({name, duration});
-        transportStreamFileSystem.open(dir + name, std::ios::binary | std::ios::out | std::ios::trunc);
+        transportStreamFileSystem.open(dir + "/" + name, std::ios::binary | std::ios::out | std::ios::trunc);
         if (!transportStreamFileSystem.is_open()) {
             fprintf(stderr, "cloud not open %s\n", name.c_str());
             return -1;
@@ -67,7 +66,7 @@ int TransportPacket::writeTransportStream(const NALPicture *picture, int &transp
         writeTable();
 
         if (list.size() > 3) {
-            char m3u8Buffer[200]{0};
+            char m3u8Buffer[512]{0};
             TransportStreamInfo info1 = list[list.size() - 1];
             TransportStreamInfo info2 = list[list.size() - 2];
             TransportStreamInfo info3 = list[list.size() - 3];
@@ -101,9 +100,10 @@ int TransportPacket::writeTransportStream(const NALPicture *picture, int &transp
         }
 
         if (list.size() > 10) {
+
             std::string &oldName = list[0].name;
-            ret = std::remove((dir + oldName).c_str());
-            if (ret != 0) {
+            ret = std::filesystem::remove(dir + "/" + oldName);
+            if (!ret) {
                 fprintf(stderr, "删除%s失败\n", oldName.c_str());
                 return ret;
             }

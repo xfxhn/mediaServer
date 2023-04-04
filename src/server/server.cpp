@@ -49,7 +49,7 @@ int Server::start() {
 }
 
 int Server::startRtspServer() {
-    while (stopFlag) {
+    while (true) {
         SOCKET clientSocket = rtsp.acceptClient();
         if (clientSocket < 0) {
             fprintf(stderr, "accept 失败\n");
@@ -68,7 +68,7 @@ int Server::startRtspServer() {
 }
 
 int Server::startHttpServer() {
-    while (stopFlag) {
+    while (true) {
         SOCKET clientSocket = http.acceptClient();
         if (clientSocket < 0) {
             fprintf(stderr, "accept 失败\n");
@@ -88,8 +88,9 @@ int Server::startHttpServer() {
 
 
 Server::~Server() {
-    stopFlag = false;
     printf("server 析构\n");
+    stopFlag = false;
+
 
     if (rtspThread->joinable()) {
         rtspThread->join();

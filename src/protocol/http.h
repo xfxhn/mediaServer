@@ -16,6 +16,9 @@ public:
 
     ~Http();
 
+private:
+    static inline std::string getBody(const std::string &str);
+
 };
 
 
