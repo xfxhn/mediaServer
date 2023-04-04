@@ -4,6 +4,7 @@
 //#include <sstream>
 #include <fstream>
 #include <filesystem>
+#include <cstring>
 #include "util.h"
 
 int Http::init(SOCKET socket) {

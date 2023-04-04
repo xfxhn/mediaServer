@@ -6,13 +6,19 @@
 #include <cstdint>
 
 #ifdef _WIN32
-
 #include <winsock.h>
-
 #else
+
+#include <arpa/inet.h>
+#include <netinet/in.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <unistd.h>
+
+#endif
+
+#ifdef __linux__
+using SOCKET = int;
 #endif
 
 class TcpSocket {

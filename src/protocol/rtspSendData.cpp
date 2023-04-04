@@ -3,6 +3,7 @@
 #include "rtspSendData.h"
 #include <fstream>
 #include <cstdio>
+#include <cstring>
 #include "writeStream.h"
 
 

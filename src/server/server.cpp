@@ -43,8 +43,6 @@ int Server::start() {
 
     rtspThread = new std::thread(&Server::startRtspServer, this);
     httpThread = new std::thread(&Server::startHttpServer, this);
-
-
     return 0;
 }
 
@@ -56,14 +54,11 @@ int Server::startRtspServer() {
             return -1;
         }
         printf("rtsp client ip:%s,client port:%d\n", rtsp.clientIp, rtsp.clientPort);
-
-
         RtspTask *task = new RtspTask(clientSocket); // NOLINT(modernize-use-auto)
         pool.addTask(task);
 
     }
-    printf("startRtspServer finish\n");
-
+    //printf("startRtspServer finish\n");
     return 0;
 }
 
@@ -75,13 +70,11 @@ int Server::startHttpServer() {
             return -1;
         }
         printf("http client ip:%s,client port:%d\n", rtsp.clientIp, rtsp.clientPort);
-
-
         HttpTask *task = new HttpTask(clientSocket); // NOLINT(modernize-use-auto)
         pool.addTask(task);
 
     }
-    printf("startHttpServer finish\n");
+   // printf("startHttpServer finish\n");
 
     return 0;
 }

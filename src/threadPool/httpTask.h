@@ -10,7 +10,10 @@ private:
     SOCKET clientSocket;
 public:
     explicit HttpTask(SOCKET socket);
+
     int run() override;
+
+    ~HttpTask();
 };
 
 

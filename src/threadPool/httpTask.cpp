@@ -50,3 +50,8 @@ int HttpTask::run() {
 
     return 0;
 }
+
+HttpTask::~HttpTask() {
+    /*退出的时候关闭这个连接*/
+    TcpSocket::closeSocket(clientSocket);
+}

@@ -11,6 +11,6 @@ target_include_directories(server
         )
 #target_compile_definitions(mediaServer PRIVATE _CRT_SECURE_NO_WARNINGS)
 #[[configurationRecord socket]]
-target_link_libraries(server PUBLIC threadPool)
+target_link_libraries(server PUBLIC threadPool PRIVATE $<$<BOOL:${UNIX}>:pthread>)
 
 
