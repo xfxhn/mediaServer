@@ -58,9 +58,8 @@ private:
     AdtsHeader adtsHeader;
 
 
-    int &packetNumber;
+    int packetNumber{0};
 public:
-    explicit RtspReceiveData(int &transportStreamPacketNumber);
 
     int init(SOCKET socket, const std::string &path, uint8_t video, uint8_t audio);
 

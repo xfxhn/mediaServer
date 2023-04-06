@@ -29,7 +29,8 @@ public:
 
     static constexpr uint32_t MAX_BUFFER_SIZE{1024 * 1024};
     /*bool pictureFinishFlag{ false };*/
-
+    NALSeqParameterSet sps;
+    NALPictureParameterSet pps;
     uint8_t spsData[50];
     uint8_t ppsData[50];
     uint8_t spsSize{0};
@@ -38,8 +39,7 @@ public:
 private:
 
     std::string path;
-    NALSeqParameterSet sps;
-    NALPictureParameterSet pps;
+
 //    NALSliceHeader sliceHeader;
 
     int clockRate{1000};
@@ -73,7 +73,7 @@ public:
 
     /*int init(const char *filename);*/
 
-    int getVideoParameter(NALPicture *picture);
+    int getVideoParameter();
 
     int init1(const std::string &dir, uint32_t transportStreamPacketNumber, int timestamp);
 

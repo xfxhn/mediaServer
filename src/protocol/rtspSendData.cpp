@@ -29,18 +29,6 @@ int RtpPacket::init(uint32_t maxFrameSize, uint8_t type) {
     return 0;
 }
 
-/*int RtpPacket::sendPacket(SOCKET socket, uint8_t *buffer, int bufferSize) {
-    int ret;
-    ret = send(socket, reinterpret_cast<const char *>(buffer), bufferSize, 0);
-    if (ret < 0) {
-        fprintf(stderr, "发送失败\n");
-        return ret;
-    }
-    ++seq;
-
-
-    return ret;
-}*/
 
 int RtpPacket::writeHeader(WriteStream &ws) const {
     ws.writeMultiBit(2, version);
@@ -67,7 +55,6 @@ int RtpPacket::writePayload(WriteStream &ws, uint8_t *data, uint32_t dataSize) {
 
 int RtpPacket::sendVideoFrame(SOCKET clientSocket, uint8_t *data, uint32_t size, uint8_t flag, uint8_t channel) {
     WriteStream ws(frameBuffer, size + RTP_HEADER_SIZE + 4 + 2);
-
 
     int ret;
 

@@ -29,14 +29,10 @@ public:
     int clientPort{0};
     static constexpr int MAX_BUFFER = 1024;
 public:
-
-
     /*创建tcp套接字*/
     int createSocket();
 
-
     int bindSocket(const char *ip, int port) const;
-
 
     int listenPort(int backlog = 10) const;
 
@@ -44,8 +40,6 @@ public:
 
 public:
     SOCKET acceptClient();
-
-    /*int receiveData(char *&data, int &dataSize) const;*/
 
     static int receive(SOCKET clientSocket, char *data, int &dataSize);
 

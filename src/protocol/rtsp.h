@@ -27,13 +27,13 @@ struct SdpInfo {
 };
 
 
-struct Info {
+/*struct Info {
     std::string session;
     std::string dir;
     SdpInfo sdp;
-    /*这个流写入到第几个ts包*/
+    *//*这个流写入到第几个ts包*//*
     int transportStreamPacketNumber{0};
-};
+};*/
 
 class ReadStream;
 
@@ -50,7 +50,10 @@ public:
     ~Rtsp();
 
 private:
-
+    SdpInfo info;
+    int transportStreamPacketNumber{-1};
+    static char response[1024];
+    std::map<std::string, std::string> obj;
     SOCKET clientSocket;
 
     std::thread *videoSendThread{nullptr};
@@ -74,7 +77,7 @@ private:
     std::string dir;
 private:
 
-    int receiveData(std::string &packet, const std::string &session) const;
+    int receiveData(std::string &packet, const std::string &session);
 
 
     int sendVideo(uint32_t number);
@@ -87,6 +90,9 @@ private:
     static int parseMediaLevel(int i, const std::vector<std::string> &list, SdpInfo &sdpInfo);
 
     static int parseAACConfig(const std::string &config, SdpInfo &sdpInfo);
+
+
+    int responseData(int status, const std::string &msg);
 
 };
 

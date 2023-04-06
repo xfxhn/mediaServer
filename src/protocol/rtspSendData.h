@@ -5,7 +5,6 @@
 #include <cstdint>
 #include "TcpSocket.h"
 
-
 class WriteStream;
 
 class RtpPacket {

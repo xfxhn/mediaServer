@@ -18,9 +18,7 @@ enum {
 };
 static constexpr uint8_t startCode[4] = {0, 0, 0, 1};
 
-RtspReceiveData::RtspReceiveData(int &transportStreamPacketNumber) : packetNumber(transportStreamPacketNumber) {
 
-}
 
 int RtspReceiveData::init(SOCKET socket, const std::string &path, uint8_t video, uint8_t audio) {
     int ret;
@@ -174,7 +172,7 @@ int RtspReceiveData::disposeRtpData(uint8_t *rtpBuffer, uint32_t rtpBufferSize, 
                 }
                 if (picture->pictureFinishFlag) {
                     /*获取到完整的一帧,做对应操作*/
-                    ret = ts.writeTransportStream(picture, packetNumber);
+                    ret = ts.writeTransportStream(picture/*, packetNumber*/);
                     if (ret < 0) {
                         fprintf(stderr, "ts.writeVideo 失败\n");
                         return -1;
@@ -200,7 +198,7 @@ int RtspReceiveData::disposeRtpData(uint8_t *rtpBuffer, uint32_t rtpBufferSize, 
 
 
             if (picture->pictureFinishFlag) {
-                ret = ts.writeTransportStream(picture, packetNumber);
+                ret = ts.writeTransportStream(picture/*, packetNumber*/);
                 if (ret < 0) {
                     fprintf(stderr, "ts.writeVideo 失败\n");
                     return -1;

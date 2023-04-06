@@ -45,7 +45,7 @@ int TransportPacket::init(std::string path) {
     return 0;
 }
 
-int TransportPacket::writeTransportStream(const NALPicture *picture, int &transportStreamPacketNumber) {
+int TransportPacket::writeTransportStream(const NALPicture *picture/*, int &transportStreamPacketNumber*/) {
     int ret;
     if (picture->sliceHeader.nalu.IdrPicFlag) {
 

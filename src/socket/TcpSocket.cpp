@@ -88,7 +88,7 @@ SOCKET TcpSocket::acceptClient() {
 
     int len = sizeof(addr);
     /*接受客户的连接请求*/
-    SOCKET clientSocket = accept(serverSocket, (sockaddr *) &addr, reinterpret_cast<socklen_t *>(&len));
+    SOCKET clientSocket = accept(serverSocket, (sockaddr *) &addr, &len);
     if (clientSocket < 0)
         return -1;
 
@@ -113,47 +113,8 @@ int TcpSocket::receive(SOCKET clientSocket, char *data, int &dataSize) {
     return 0;
 }
 
-/*int TcpSocket::receiveData(char*& data, int& dataSize) const {
-
-	int ret = 0;
-	char buf[MAX_BUFFER]{ 0 };
-	int size = 0;
-	//char *aaa = new char[MAX_BUFFER];
-	*//*rtsp 最后一行则直接为回车符（CR）和换行符（LF），表示本次请求报文结束*//*
-	while (true) {
-
-		int bufferSize = recv(clientSocket, buf, MAX_BUFFER, 0);
-		*//*这里返回0的话表示对端关闭了连接，发送了FIN包*//*
-		if (bufferSize <= 0) {
-			ret = bufferSize;
-			break;
-		}
-		char* temp = new char[size + bufferSize + 1];
-		*//*把aaa的数据全部拷贝到temp上*//*
-		memcpy(temp, data, size);
-		*//*再把新接收的数据拷贝到bbb上*//*
-		memcpy(temp + size, buf, bufferSize);
-
-		delete[] data;
-		data = temp;
-
-		size += bufferSize;
-
-		if (data[size - 1] == '\n' && data[size - 2] == '\r' && data[size - 3] == '\n' && data[size - 4] == '\r') {
-			*//*表示这次请求报文结束*//*
-			data[size] = '\0';
-			ret = 1;
-			break;
-		}
-	}
-
-	dataSize = size;
-	return ret;
-
-}*/
 
 int TcpSocket::sendData(SOCKET clientSocket, uint8_t *buffer, int length) {
-
 
     int ret = send(clientSocket, reinterpret_cast<const char *>(buffer), length, 0);
     if (ret < 0) {

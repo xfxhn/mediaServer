@@ -42,7 +42,6 @@ int HttpTask::run() {
                 return ret;
             }
 
-
             // 继续查找下一个分隔符位置
             pos = packet.find("\r\n\r\n");
         }

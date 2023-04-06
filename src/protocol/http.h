@@ -8,7 +8,8 @@
 
 class Http {
 private:
-    SOCKET clientSocket;
+    static char response[1024];
+    SOCKET clientSocket{0};
 public:
     int init(SOCKET socket);
 
@@ -17,8 +18,8 @@ public:
     ~Http();
 
 private:
-    static inline std::string getBody(const std::string &str);
 
+    int responseData(int status, const std::string &msg) const;
 };
 
 

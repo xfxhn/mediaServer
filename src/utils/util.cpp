@@ -3,7 +3,7 @@
 #include <bitset>
 #include <functional>
 
-static uint8_t alphabet_map[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+static char alphabet_map[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 static uint8_t reverse_map[] =
         {
                 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
@@ -26,7 +26,7 @@ std::string trim(const std::string &str) {
     return str.substr(start, end - start + 1);
 }
 
-int base64_encode(const std::string &text, uint8_t *encode) {
+/*int base64_encode(const std::string &text, uint8_t *encode) {
     uint32_t text_len = text.length();
     int i, j;
     for (i = 0, j = 0; i + 3 <= text_len; i += 3) {
@@ -54,7 +54,7 @@ int base64_encode(const std::string &text, uint8_t *encode) {
         }
     }
     return j;
-}
+}*/
 
 int base64_decode(const std::string &code, uint8_t *plain) {
     uint32_t code_len = code.length();
@@ -89,8 +89,42 @@ int base64_decode(const std::string &code, uint8_t *plain) {
     return j;
 }
 
-/*这个初始化可能会抛出异常，所以clion会给警告，并且无法捕获*/
-static const std::string base64_chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+std::string base64_encode(const uint8_t *data, uint32_t size) {
+
+    std::string encoded;
+    size_t i = 0;
+    uint32_t triad = 0;
+
+    while (i < size) {
+        switch (i % 3) {
+            case 0:
+                triad = (data[i] << 16) + (data[i + 1] << 8) + data[i + 2];
+                encoded.push_back(alphabet_map[(triad >> 18) & 0x3F]);
+                encoded.push_back(alphabet_map[(triad >> 12) & 0x3F]);
+                encoded.push_back(alphabet_map[(triad >> 6) & 0x3F]);
+                encoded.push_back(alphabet_map[triad & 0x3F]);
+                i += 3;
+                break;
+            case 1:
+                triad = (data[i] << 16) + (data[i + 1] << 8);
+                encoded.push_back(alphabet_map[(triad >> 18) & 0x3F]);
+                encoded.push_back(alphabet_map[(triad >> 12) & 0x3F]);
+                encoded.push_back(alphabet_map[(triad >> 6) & 0x3F]);
+                encoded.push_back('=');
+                i += 2;
+                break;
+            case 2:
+                triad = (data[i] << 16);
+                encoded.push_back(alphabet_map[(triad >> 18) & 0x3F]);
+                encoded.push_back(alphabet_map[(triad >> 12) & 0x3F]);
+                encoded.push_back('=');
+                encoded.push_back('=');
+                i += 1;
+                break;
+        }
+    }
+    return encoded;
+}
 
 std::string generatorDate() {
     // 使用time函数获取当前时间，并存储在now变量中
@@ -109,94 +143,13 @@ std::string generatorDate() {
     return buffer;
 }
 
-int decodeBase64(std::string text, std::vector<uint8_t> &data) {
-    // 定义一个存储解码后的字节的向量
-    // std::vector<uint8_t> data;
-    // 定义一个存储解码后的文本的字符串
-    // std::string result;
-    // 去掉text末尾的=号
-    while (text.back() == '=') {
-        text.pop_back();
-    }
-    // 遍历text中的每个字符
-    for (size_t i = 0; i < text.size(); i += 4) {
-        // 定义一个存储24位二进制数的字符串
-        std::string bits;
-        // 对每个字符进行解码，转换成6位二进制数，并拼接到bits中
-        for (size_t j = 0; j < 4; j++) {
-            // 在base64字符表中查找字符的索引
-            size_t index = base64_chars.find(text[i + j]);
-            // 如果找不到，返回空字符串
-            if (index == std::string::npos) {
-                return -1;
-            }
-            // 将索引转换成6位二进制数，并拼接到bits中
-            bits += std::bitset<6>(index).to_string();
-        }
-        // 将bits按照8位一组分割成字节，并存储到data中
-        for (size_t k = 0; k < 24; k += 8) {
-            // 将8位二进制数转换成无符号字符
-            uint8_t byte = std::bitset<8>(bits.substr(k, 8)).to_ulong();
-            // 将无符号字符存储到data中
-            data.push_back(byte);
-        }
-    }
-    return 0;
-//    // 将data中的字节转换成字符串，并拼接到result中
-//    for (auto byte: data) {
-//        result += byte;
-//    }
-//    // 返回result
-//    return result;
-}
-
-std::string encodeBase64(const uint8_t *data, uint32_t size) {
-    /*static const char *base64_chars =
-            "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-            "abcdefghijklmnopqrstuvwxyz"
-            "0123456789+/";*/
-
-    std::string encoded;
-    size_t i = 0;
-    uint32_t triad = 0;
-
-    while (i < size) {
-        switch (i % 3) {
-            case 0:
-                triad = (data[i] << 16) + (data[i + 1] << 8) + data[i + 2];
-                encoded.push_back(base64_chars[(triad >> 18) & 0x3F]);
-                encoded.push_back(base64_chars[(triad >> 12) & 0x3F]);
-                encoded.push_back(base64_chars[(triad >> 6) & 0x3F]);
-                encoded.push_back(base64_chars[triad & 0x3F]);
-                i += 3;
-                break;
-            case 1:
-                triad = (data[i] << 16) + (data[i + 1] << 8);
-                encoded.push_back(base64_chars[(triad >> 18) & 0x3F]);
-                encoded.push_back(base64_chars[(triad >> 12) & 0x3F]);
-                encoded.push_back(base64_chars[(triad >> 6) & 0x3F]);
-                encoded.push_back('=');
-                i += 2;
-                break;
-            case 2:
-                triad = (data[i] << 16);
-                encoded.push_back(base64_chars[(triad >> 18) & 0x3F]);
-                encoded.push_back(base64_chars[(triad >> 12) & 0x3F]);
-                encoded.push_back('=');
-                encoded.push_back('=');
-                i += 1;
-                break;
-        }
-    }
-    return encoded;
-}
 
 std::string GenerateSpropParameterSets(const uint8_t *sps, uint32_t spsSize, uint8_t *pps, uint32_t ppsSize) {
     std::stringstream ss;
 
-    ss << encodeBase64(sps, spsSize);
+    ss << base64_encode(sps, spsSize);
     ss << ",";
-    ss << encodeBase64(pps, ppsSize);
+    ss << base64_encode(pps, ppsSize);
 
     return ss.str();
 }

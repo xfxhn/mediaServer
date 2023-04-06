@@ -66,6 +66,16 @@ void AdtsReader::reset() {
     audioDecodeFrameNumber = 0;
 }
 
+int AdtsReader::getAudioParameter() {
+    int ret;
+    ret = findFrame(parameter);
+    if (ret < 0) {
+        fprintf(stderr, "findFrame失败\n");
+        return ret;
+    }
+    disposeAudio(parameter, parameter.data, parameter.size);
+    return 0;
+}
 
 int AdtsReader::findFrame(AdtsHeader &header) {
     int ret;
@@ -212,6 +222,8 @@ int AdtsReader::getTransportStreamData() {
 
     return 0;
 }
+
+
 
 
 
