@@ -172,7 +172,7 @@ int RtspReceiveData::disposeRtpData(uint8_t *rtpBuffer, uint32_t rtpBufferSize, 
                 }
                 if (picture->pictureFinishFlag) {
                     /*获取到完整的一帧,做对应操作*/
-                    ret = ts.writeTransportStream(picture/*, packetNumber*/);
+                    ret = ts.writeTransportStream(picture);
                     if (ret < 0) {
                         fprintf(stderr, "ts.writeVideo 失败\n");
                         return -1;
@@ -198,7 +198,7 @@ int RtspReceiveData::disposeRtpData(uint8_t *rtpBuffer, uint32_t rtpBufferSize, 
 
 
             if (picture->pictureFinishFlag) {
-                ret = ts.writeTransportStream(picture/*, packetNumber*/);
+                ret = ts.writeTransportStream(picture);
                 if (ret < 0) {
                     fprintf(stderr, "ts.writeVideo 失败\n");
                     return -1;

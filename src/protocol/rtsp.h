@@ -52,7 +52,7 @@ public:
 private:
     SdpInfo info;
     int transportStreamPacketNumber{-1};
-    static char response[1024];
+    static char response[2048];
     std::map<std::string, std::string> obj;
     SOCKET clientSocket;
 
@@ -67,17 +67,16 @@ private:
 
     /*这个是当前rtsp流生成的唯一id*/
     std::string uniqueSession;
-    /*这个是拉流的时候要去拉的那个流id*/
-    std::string pullSession;
 
     bool stopVideoSendFlag{true};
     bool stopAudioSendFlag{true};
 
     /*拉流用的*/
     std::string dir;
+    bool flag{false};
 private:
 
-    int receiveData(std::string &packet, const std::string &session);
+    int receiveData(std::string &packet);
 
 
     int sendVideo(uint32_t number);

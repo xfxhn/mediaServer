@@ -58,7 +58,6 @@ private:
     AdtsHeader adtsHeader;
 
 
-    int packetNumber{0};
 public:
 
     int init(SOCKET socket, const std::string &path, uint8_t video, uint8_t audio);

@@ -88,7 +88,7 @@ SOCKET TcpSocket::acceptClient() {
 
     int len = sizeof(addr);
     /*接受客户的连接请求*/
-    SOCKET clientSocket = accept(serverSocket, (sockaddr *) &addr, &len);
+    SOCKET clientSocket = accept(serverSocket, (sockaddr *) &addr, reinterpret_cast<socklen_t *>(&len));
     if (clientSocket < 0)
         return -1;
 
