@@ -26,7 +26,6 @@ enum NalUintType {
 class NALReader {
 public:
 
-
     static constexpr uint32_t MAX_BUFFER_SIZE{1024 * 1024};
     /*bool pictureFinishFlag{ false };*/
     NALSeqParameterSet sps;
@@ -70,40 +69,41 @@ private:
 
 public:
 
-
-    /*int init(const char *filename);*/
+    void putData(uint8_t *data, uint32_t size);
 
     int getVideoParameter();
 
+
     int init1(const std::string &dir, uint32_t transportStreamPacketNumber, int timestamp);
 
-    int readNalUint1(uint8_t *&data, uint32_t &size);
+    int init2();
 
-//    int readNalUint(uint8_t *&data, uint32_t &size, int &startCodeLength, bool &isStopLoop);
-//
-//    int getVideoFrame(NALPicture *&picture, bool &flag);
+    int readNalUint(uint8_t *&data, uint32_t &size);
 
     int getVideoFrame1(NALPicture *&picture);
 
     int getVideoFrame2(NALPicture *&picture, uint8_t *data, uint32_t size, uint8_t startCodeLength);
+
+    int getVideoFrame3(NALPicture *&picture);
 
 
     NALPicture *allocPicture();
 
     void reset();
 
+    void resetBuffer();
 
     ~NALReader();
 
 private:
+
+
     int test1(NALPicture *picture, uint8_t *data, uint32_t size, uint8_t startCodeLength);
 
     int findNALU(uint8_t *&pos1, uint8_t *&pos2, int &startCodeLen1, int &startCodeLen2);
 
     int getTransportStreamData();
 
-/*    static int getNextStartCode(uint8_t *bufPtr, const uint8_t *end, uint8_t *&pos1, uint8_t *&pos2, int &startCodeLen1,
-                                int &startCodeLen2);*/
 
     void computedTimestamp(NALPicture *picture);
 };

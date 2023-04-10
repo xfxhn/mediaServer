@@ -16,8 +16,10 @@ class WriteStream;
  * */
 class AdtsHeader {
 public:
-    static uint8_t header[7];
 
+
+    static uint8_t header[7];
+    bool finishFlag{false};
     uint8_t *data{nullptr};
     uint32_t size{0};
     uint64_t pts{0};

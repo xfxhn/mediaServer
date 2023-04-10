@@ -7,37 +7,6 @@
 #include "readStream.h"
 
 
-#define min(a, b) ( (a) < (b) ? (a) : (b) )
-
-
-//int AdtsReader::init(const char *filename) {
-//    fs.open(filename, std::ios::out | std::ios::binary);
-//    if (!fs.is_open()) {
-//        fprintf(stderr, "open %s failed\n", filename);
-//        return -1;
-//    }
-//
-//
-//    //最大ADTS头是9，没有差错校验就是7
-//    buffer = new uint8_t[MAX_BUFFER_SIZE];
-//    fs.read(reinterpret_cast<char *>(buffer), MAX_BUFFER_SIZE);
-//    blockBufferSize = fs.gcount();
-//
-//
-//    if (blockBufferSize < MAX_HEADER_SIZE) {
-//        fprintf(stderr, "数据不完整\n");
-//        return -1;
-//    }
-//
-//    if (memcmp(buffer, "ID3", 3) == 0) {
-//        fprintf(stderr, "不支持解析ID3\n");
-//        return -1;
-//    } else if (memcmp(buffer, "ADIF", 4) == 0) {
-//        fprintf(stderr, "不支持解析ADIF格式\n");
-//        return -1;
-//    }
-//    return 0;
-//}
 
 int AdtsReader::init1(const std::string &dir, uint32_t transportStreamPacketNumber) {
     path = dir;
@@ -54,6 +23,12 @@ int AdtsReader::init1(const std::string &dir, uint32_t transportStreamPacketNumb
 
     blockBufferSize = 0;
 
+    return 0;
+}
+
+int AdtsReader::init2() {
+    buffer = new uint8_t[MAX_BUFFER_SIZE];
+    blockBufferSize = 0;
     return 0;
 }
 
@@ -75,6 +50,18 @@ int AdtsReader::getAudioParameter() {
     }
     disposeAudio(parameter, parameter.data, parameter.size);
     return 0;
+}
+
+void AdtsReader::resetBuffer() {
+    /*还剩多少字节未读取*/
+    uint32_t remainingByte = bufferEnd - bufferPosition;
+    if (remainingByte > 0) {
+        memcpy(buffer, bufferPosition, remainingByte);
+        blockBufferSize = remainingByte;
+        bufferEnd = buffer + remainingByte;
+        bufferPosition = bufferEnd;
+    }
+
 }
 
 int AdtsReader::findFrame(AdtsHeader &header) {
@@ -131,6 +118,59 @@ int AdtsReader::findFrame(AdtsHeader &header) {
     return 0;
 }
 
+void AdtsReader::putData(uint8_t *data, uint32_t size) {
+    memcpy(buffer + blockBufferSize, data, size);
+    blockBufferSize += size;
+    bufferEnd = buffer + blockBufferSize;
+}
+
+int AdtsReader::getAudioFrame2(AdtsHeader &header) {
+    int ret;
+    if (buffer == nullptr) {
+        fprintf(stderr, "请初始化\n");
+        return -1;
+    }
+    if (blockBufferSize < MAX_HEADER_SIZE) {
+        return 0;
+    }
+    while (true) {
+        ReadStream rs(buffer, blockBufferSize);
+        if (rs.getMultiBit(12) != 0xFFF) {
+            fprintf(stderr, "格式不对,不等于0xFFF\n");
+            return -1;
+        }
+
+        ret = header.adts_fixed_header(rs);
+        if (ret < 0) {
+            fprintf(stderr, "解析adts fixed header失败\n");
+            return -1;
+        }
+        header.adts_variable_header(rs);
+
+        uint16_t frameLength = header.frame_length;
+
+        if (blockBufferSize >= frameLength) {
+            header.data = &buffer[MAX_HEADER_SIZE];
+            header.size = frameLength - MAX_HEADER_SIZE;
+            bufferPosition = buffer + frameLength;
+            disposeAudio(header, header.data, header.size);
+            break;
+        }
+
+//        if (blockBufferSize < frameLength) {
+//            return 0;
+//        } else {
+//            header.data = &buffer[MAX_HEADER_SIZE];
+//            header.size = frameLength - MAX_HEADER_SIZE;
+//            bufferPosition = buffer + frameLength;
+//            disposeAudio(header, header.data, header.size);
+//            return 1;
+//        }
+    }
+
+
+    return 0;
+}
 
 int AdtsReader::getAudioFrame1(AdtsHeader &header) {
     int ret;
@@ -143,13 +183,6 @@ int AdtsReader::getAudioFrame1(AdtsHeader &header) {
     return 0;
 }
 
-AdtsReader::~AdtsReader() {
-    if (buffer) {
-        delete[] buffer;
-        buffer = nullptr;
-    }
-    fs.close();
-}
 
 void AdtsReader::disposeAudio(AdtsHeader &header, uint8_t *data, uint32_t size) {
     header.data = data;
@@ -160,7 +193,9 @@ void AdtsReader::disposeAudio(AdtsHeader &header, uint8_t *data, uint32_t size) 
     /*转换成微秒*/
     header.interval = (int) (1024.0 / (double) header.sample_rate * 1000.0);
     audioDecodeFrameNumber += 1024;
+    header.finishFlag = true;
 }
+
 
 int AdtsReader::getTransportStreamData() {
     int ret;
@@ -222,6 +257,16 @@ int AdtsReader::getTransportStreamData() {
 
     return 0;
 }
+
+
+AdtsReader::~AdtsReader() {
+    if (buffer) {
+        delete[] buffer;
+        buffer = nullptr;
+    }
+    fs.close();
+}
+
 
 
 

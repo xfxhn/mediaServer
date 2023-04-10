@@ -25,22 +25,13 @@ void NALReader::reset() {
 //    finishFlag = false;
 }
 
-//int NALReader::init(const char *filename) {
-////    fs.open(filename, std::ios::out | std::ios::binary);
-////
-////    if (!fs.is_open()) {
-////        fprintf(stderr, "open %s failed\n", filename);
-////        return -1;
-////    }
-////    bufferStart = new uint8_t[MAX_BUFFER_SIZE];
-////    fs.read(reinterpret_cast<char *>(bufferStart), MAX_BUFFER_SIZE);
-////    blockBufferSize = fs.gcount();
-////
-////    bufferPosition = bufferStart;
-////    bufferEnd = bufferStart + blockBufferSize - 1;
-//
-//    return 0;
-//}
+int NALReader::init2() {
+
+    bufferStart = new uint8_t[MAX_BUFFER_SIZE];
+    //unoccupiedPicture = allocPicture();
+    blockBufferSize = 0;
+    return 0;
+}
 
 int NALReader::init1(const std::string &dir, uint32_t transportStreamPacketNumber, int timestamp) {
     path = dir;
@@ -54,8 +45,8 @@ int NALReader::init1(const std::string &dir, uint32_t transportStreamPacketNumbe
         return -1;
     }
 
-    bufferStart = new uint8_t[MAX_BUFFER_SIZE];
 
+    bufferStart = new uint8_t[MAX_BUFFER_SIZE];
     blockBufferSize = 0;
 
     return 0;
@@ -119,7 +110,8 @@ int NALReader::getTransportStreamData() {
     return 0;
 }
 
-int NALReader::readNalUint1(uint8_t *&data, uint32_t &size) {
+
+int NALReader::readNalUint(uint8_t *&data, uint32_t &size) {
     int ret;
     uint8_t *pos1 = nullptr;
     uint8_t *pos2 = nullptr;
@@ -155,6 +147,12 @@ int NALReader::readNalUint1(uint8_t *&data, uint32_t &size) {
         }
     }
     return 0;
+}
+
+void NALReader::putData(uint8_t *data, uint32_t size) {
+    memcpy(bufferStart + blockBufferSize, data, size);
+    blockBufferSize += size;
+    bufferEnd = bufferStart + blockBufferSize;
 }
 
 int NALReader::findNALU(uint8_t *&pos1, uint8_t *&pos2, int &startCodeLen1, int &startCodeLen2) {
@@ -214,7 +212,7 @@ int NALReader::getVideoParameter() {
     bool flag1 = true;
     bool flag2 = true;
     while (flag1 || flag2) {
-        ret = readNalUint1(data, size);
+        ret = readNalUint(data, size);
         if (ret < 0) {
             fprintf(stderr, "读取nalu单元错误\n");
             return ret;
@@ -244,6 +242,18 @@ int NALReader::getVideoParameter() {
     return 0;
 }
 
+void NALReader::resetBuffer() {
+    uint32_t remainingByte = bufferEnd - bufferPosition;
+    if (remainingByte > 0) {
+        memcpy(bufferStart, bufferPosition, remainingByte);
+        blockBufferSize = remainingByte;
+        bufferEnd = bufferStart + remainingByte;
+        bufferPosition = bufferEnd;
+    }
+
+}
+
+
 int NALReader::getVideoFrame1(NALPicture *&picture) {
     int ret;
 
@@ -254,7 +264,7 @@ int NALReader::getVideoFrame1(NALPicture *&picture) {
     }
 
     while (!picture->pictureFinishFlag) {
-        ret = readNalUint1(data, size);
+        ret = readNalUint(data, size);
         if (ret < 0) {
             fprintf(stderr, "读取nalu单元错误\n");
             return ret;
@@ -285,6 +295,25 @@ int NALReader::getVideoFrame2(NALPicture *&picture, uint8_t *data, uint32_t size
     return 0;
 }
 
+int NALReader::getVideoFrame3(NALPicture *&picture) {
+    int ret;
+    uint8_t *pos1 = nullptr;
+    uint8_t *pos2 = nullptr;
+    int startCodeLen1 = 0;
+    int startCodeLen2 = 0;
+
+
+    ret = findNALU(pos1, pos2, startCodeLen1, startCodeLen2);
+    if (ret == 2) {
+        uint8_t *data = pos1 + startCodeLen1;
+        uint32_t size = pos2 - data;
+
+        getVideoFrame2(picture, data, size, 0);
+        bufferPosition = pos2;
+    }
+    return ret;
+}
+
 int NALReader::test1(NALPicture *picture, uint8_t *data, uint32_t size, uint8_t startCodeLength) {
     int ret;
 
@@ -293,7 +322,6 @@ int NALReader::test1(NALPicture *picture, uint8_t *data, uint32_t size, uint8_t 
         /*有起始码的*/
         memcpy(spsData, data, size);
         spsSize = size;
-
 
         size -= startCodeLength;
         /*去除防竞争字节*/
@@ -305,10 +333,8 @@ int NALReader::test1(NALPicture *picture, uint8_t *data, uint32_t size, uint8_t 
         sps.seq_parameter_set_data(rs);
         spsList[sps.seq_parameter_set_id] = sps;
         picture->pictureFinishFlag = false;
-        /*picture->size += size;
-        picture->data.push_back({size, data, 0});*/
+        picture->finishFlag = false;
     } else if (nalUnitHeader.nal_unit_type == H264_NAL_PPS) {
-
 
         /*有起始码的*/
         memcpy(ppsData, data, size);
@@ -319,12 +345,10 @@ int NALReader::test1(NALPicture *picture, uint8_t *data, uint32_t size, uint8_t 
         NALHeader::ebsp_to_rbsp(ebsp, size);
         ReadStream rs(ebsp, size);
 
-
         pps.pic_parameter_set_rbsp(rs, spsList);
         ppsList[pps.pic_parameter_set_id] = pps;
         picture->pictureFinishFlag = false;
-        /* picture->size += size;
-         picture->data.push_back({size, data, 2});*/
+        picture->finishFlag = false;
     } else if (nalUnitHeader.nal_unit_type == H264_NAL_SLICE) {
 
         /*
@@ -375,6 +399,7 @@ int NALReader::test1(NALPicture *picture, uint8_t *data, uint32_t size, uint8_t 
         picture->data.push_back({size, data, 0});
 
         picture->pictureFinishFlag = true;
+        picture->finishFlag = true;
     } else if (nalUnitHeader.nal_unit_type == H264_NAL_IDR_SLICE) {
 
 
@@ -429,9 +454,11 @@ int NALReader::test1(NALPicture *picture, uint8_t *data, uint32_t size, uint8_t 
         picture->size += size;
         picture->data.push_back({size, data, 3});
         picture->pictureFinishFlag = true;
+        picture->finishFlag = true;
     } else {
         fprintf(stderr, "其他type\n");
         picture->pictureFinishFlag = false;
+        picture->finishFlag = false;
     }
     return 0;
 }
@@ -471,6 +498,8 @@ NALReader::~NALReader() {
         bufferStart = nullptr;
     }
 }
+
+
 
 
 

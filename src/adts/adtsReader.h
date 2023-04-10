@@ -41,6 +41,7 @@ public:
     int getAudioParameter();
 
     int init1(const std::string &dir, uint32_t transportStreamPacketNumber);
+    int init2();
 
     int findFrame(AdtsHeader &header);
 
@@ -48,7 +49,13 @@ public:
 
     int getAudioFrame1(AdtsHeader &header);
 
+    int getAudioFrame2(AdtsHeader &header);
+
+    void resetBuffer();
+
     void disposeAudio(AdtsHeader &header, uint8_t *data, uint32_t size);
+
+    void putData(uint8_t *data, uint32_t size);
 
     ~AdtsReader();
 

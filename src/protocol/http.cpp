@@ -28,16 +28,44 @@ int Http::parse(std::string &packet, const std::string &data) {
     iss >> method >> path >> version;
 
     list.erase(list.begin());
+    request = getObj(list, ":");
 
-    std::map<std::string, std::string> obj = getObj(list, ":");
+    if (method != "GET") {
+        fprintf(stderr, "method = %s\n", method.c_str());
+        responseData(405, "Method Not Allowed");
+        return -1;
+    }
+
 
     std::filesystem::path source("." + path);
+
+    if (!std::filesystem::exists(source)) {
+        responseData(404, "找不到对应的流");
+        return -1;
+    }
 
     std::string mimeType;
     if (source.extension() == ".m3u8") {
         mimeType = "application/x-mpegurl";
+        ret = disposeTransStream(source.string(), mimeType);
+        if (ret < 0) {
+            fprintf(stderr, "disposeTransStream 失败\n");
+            return ret;
+        }
     } else if (source.extension() == ".ts") {
         mimeType = "video/mp2t";
+        ret = disposeTransStream(source.string(), mimeType);
+        if (ret < 0) {
+            fprintf(stderr, "disposeTransStream 失败\n");
+            return ret;
+        }
+    } else if (source.extension() == ".flv") {
+        mimeType = "video/x-flv";
+        ret = disposeFLV(source.string(), mimeType);
+        if (ret < 0) {
+            fprintf(stderr, "disposeTransStream 失败\n");
+            return ret;
+        }
     } else {
         fprintf(stderr, "不支持这种类型\n");
         responseData(415, "Unsupported Media Type");
@@ -45,16 +73,21 @@ int Http::parse(std::string &packet, const std::string &data) {
     }
 
 
+    return 0;
+}
 
-    if (method != "GET") {
-        fprintf(stderr, "method = %s\n", method.c_str());
-        responseData(405, "Method Not Allowed");
-        return -1;
-    }
-    std::ifstream fs("." + path, std::ios::binary | std::ios::ate);
+
+int Http::disposeFLV(const std::string& path, const std::string& mimeType) {
+    return 0;
+}
+
+
+int Http::disposeTransStream(const std::string& path, const std::string& mimeType) {
+    int ret;
+    std::ifstream fs(path, std::ios::binary | std::ios::ate);
     if (!fs.good()) {
         fprintf(stderr, "当前文件不可读 %s\n", ("." + path).c_str());
-        responseData(404, "Not Found");
+        responseData(500, "当前文件不可读");
         return -1;
     }
 
@@ -79,8 +112,6 @@ int Http::parse(std::string &packet, const std::string &data) {
     return 0;
 }
 
-Http::~Http() = default;
-
 
 int Http::responseData(int status, const std::string &msg) const {
     memset(response, 0, 1024);
@@ -104,3 +135,5 @@ int Http::responseData(int status, const std::string &msg) const {
     }
     return 0;
 }
+
+Http::~Http() = default;

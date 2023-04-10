@@ -19,7 +19,6 @@ enum {
 static constexpr uint8_t startCode[4] = {0, 0, 0, 1};
 
 
-
 int RtspReceiveData::init(SOCKET socket, const std::string &path, uint8_t video, uint8_t audio) {
     int ret;
     ret = ts.init(path);
@@ -32,6 +31,8 @@ int RtspReceiveData::init(SOCKET socket, const std::string &path, uint8_t video,
         fprintf(stderr, "获取frame失败\n");
         return -1;
     }
+
+//    videoReader.init();
 
     videoChannel = video;
     audioChannel = audio;
