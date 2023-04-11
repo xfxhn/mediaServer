@@ -6,6 +6,10 @@
 #include "readStream.h"
 #include "NALPicture.h"
 
+/*存储一个启动时间，然后在每个要发送的函数里获取当前时间，用当前的这个时间减去启动时间
+ * 然后用这个时间和dts作比较，如果dts大于这个时间，就不发送
+ * */
+
 int AVPacket::init(const std::string &dir, uint32_t transportStreamPacketNumber) {
     path = dir;
     currentPacket = transportStreamPacketNumber;
@@ -24,11 +28,22 @@ int AVPacket::init(const std::string &dir, uint32_t transportStreamPacketNumber)
 
 
     picture = videoReader.allocPicture();
+    start = std::chrono::high_resolution_clock::now();
     return 0;
 }
 
 int AVPacket::getTransportStreamData() {
+
+
     int ret = 0;
+
+    std::chrono::duration<uint64_t, std::milli> elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::high_resolution_clock::now() - start);
+    /*需要视频的dts和音频的dts都小于这个时间才会去读取*/
+    if (header.dts > elapsed.count() || picture->dts > elapsed.count()) {
+        return 1;
+    }
+
     std::string name;
     uint32_t size = 0;
     while (true) {
@@ -89,9 +104,26 @@ int AVPacket::getTransportStreamData() {
     return ret;
 }
 
-int AVPacket::readFrame(Packet *packet) {
-    /*这里循环，里面判断是否数据足够一帧了，如果没有足够一帧，那么就继续往里面添加数据，如果有了，就退出循环*/
+#include <iostream>
 
+int AVPacket::test() {
+    int ret;
+    Packet *packet = allocPacket();
+
+    while (true) {
+        ret = readFrame(packet);
+        if (ret < 0) {
+            return -1;
+        }
+
+        std::cout << packet->type << std::endl;
+    }
+
+
+    return 0;
+}
+
+int AVPacket::readFrame(Packet *packet) {
     int ret;
     header.finishFlag = false;
     picture->finishFlag = false;
@@ -105,6 +137,11 @@ int AVPacket::readFrame(Packet *packet) {
         if (ret < 0) {
             fprintf(stderr, "getTransportStreamData 失败\n");
             return ret;
+        }
+
+        if (ret == 1) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            continue;
         }
 
         if (ret == VIDEO_PID) {
@@ -122,6 +159,8 @@ int AVPacket::readFrame(Packet *packet) {
                 packet->size = picture->size;
                 packet->type = "video";
                 break;
+            } else {
+                videoReader.resetBuffer();
             }
 
         } else if (ret == AUDIO_PID) {
@@ -138,6 +177,8 @@ int AVPacket::readFrame(Packet *packet) {
                 packet->size = header.size;
                 packet->type = "audio";
                 break;
+            } else {
+                audioReader.resetBuffer();
             }
         }
 

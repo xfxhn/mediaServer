@@ -7,7 +7,6 @@
 #include "readStream.h"
 
 
-
 int AdtsReader::init1(const std::string &dir, uint32_t transportStreamPacketNumber) {
     path = dir;
     currentPacket = transportStreamPacketNumber;
@@ -55,11 +54,11 @@ int AdtsReader::getAudioParameter() {
 void AdtsReader::resetBuffer() {
     /*还剩多少字节未读取*/
     uint32_t remainingByte = bufferEnd - bufferPosition;
+    blockBufferSize = remainingByte;
+    bufferEnd = buffer + remainingByte;
+    bufferPosition = bufferEnd;
     if (remainingByte > 0) {
         memcpy(buffer, bufferPosition, remainingByte);
-        blockBufferSize = remainingByte;
-        bufferEnd = buffer + remainingByte;
-        bufferPosition = bufferEnd;
     }
 
 }
@@ -133,40 +132,56 @@ int AdtsReader::getAudioFrame2(AdtsHeader &header) {
     if (blockBufferSize < MAX_HEADER_SIZE) {
         return 0;
     }
-    while (true) {
-        ReadStream rs(buffer, blockBufferSize);
-        if (rs.getMultiBit(12) != 0xFFF) {
-            fprintf(stderr, "格式不对,不等于0xFFF\n");
-            return -1;
-        }
 
-        ret = header.adts_fixed_header(rs);
-        if (ret < 0) {
-            fprintf(stderr, "解析adts fixed header失败\n");
-            return -1;
-        }
-        header.adts_variable_header(rs);
+    ReadStream rs(buffer, blockBufferSize);
+    if (rs.getMultiBit(12) != 0xFFF) {
+        fprintf(stderr, "格式不对,不等于0xFFF\n");
+        return -1;
+    }
 
-        uint16_t frameLength = header.frame_length;
+    ret = header.adts_fixed_header(rs);
+    if (ret < 0) {
+        fprintf(stderr, "解析adts fixed header失败\n");
+        return -1;
+    }
+    header.adts_variable_header(rs);
 
-        if (blockBufferSize >= frameLength) {
-            header.data = &buffer[MAX_HEADER_SIZE];
-            header.size = frameLength - MAX_HEADER_SIZE;
-            bufferPosition = buffer + frameLength;
-            disposeAudio(header, header.data, header.size);
-            break;
-        }
+    uint16_t frameLength = header.frame_length;
 
-//        if (blockBufferSize < frameLength) {
-//            return 0;
-//        } else {
+    if (blockBufferSize >= frameLength) {
+        header.data = &buffer[MAX_HEADER_SIZE];
+        header.size = frameLength - MAX_HEADER_SIZE;
+        bufferPosition = buffer + frameLength;
+        disposeAudio(header, header.data, header.size);
+    } else {
+        bufferPosition = bufferEnd;
+    }
+
+//    while (true) {
+//        ReadStream rs(buffer, blockBufferSize);
+//        if (rs.getMultiBit(12) != 0xFFF) {
+//            fprintf(stderr, "格式不对,不等于0xFFF\n");
+//            return -1;
+//        }
+//
+//        ret = header.adts_fixed_header(rs);
+//        if (ret < 0) {
+//            fprintf(stderr, "解析adts fixed header失败\n");
+//            return -1;
+//        }
+//        header.adts_variable_header(rs);
+//
+//        uint16_t frameLength = header.frame_length;
+//
+//        if (blockBufferSize >= frameLength) {
 //            header.data = &buffer[MAX_HEADER_SIZE];
 //            header.size = frameLength - MAX_HEADER_SIZE;
 //            bufferPosition = buffer + frameLength;
 //            disposeAudio(header, header.data, header.size);
-//            return 1;
+//            break;
 //        }
-    }
+//
+//    }
 
 
     return 0;

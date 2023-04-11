@@ -35,6 +35,12 @@ public:
     uint8_t spsSize{0};
     uint8_t ppsSize{0};
     /*uint32_t remainingByte{0};*/
+
+
+    uint8_t *bufferStart{nullptr};
+    uint8_t *bufferPosition{nullptr};
+    uint8_t *bufferEnd{nullptr};
+    uint32_t blockBufferSize{0};
 private:
 
     std::string path;
@@ -49,10 +55,7 @@ private:
 
 
     std::ifstream fs;
-    uint8_t *bufferStart{nullptr};
-    uint8_t *bufferPosition{nullptr};
-    uint8_t *bufferEnd{nullptr};
-    uint32_t blockBufferSize{0};
+
 
 private:
     NALPicture *unoccupiedPicture{nullptr};

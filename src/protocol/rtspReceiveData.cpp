@@ -26,27 +26,28 @@ int RtspReceiveData::init(SOCKET socket, const std::string &path, uint8_t video,
         fprintf(stderr, "init ts失败\n");
         return ret;
     }
+
+    videoReader.init2();
     picture = videoReader.allocPicture();
     if (picture == nullptr) {
         fprintf(stderr, "获取frame失败\n");
         return -1;
     }
 
-//    videoReader.init();
 
     videoChannel = video;
     audioChannel = audio;
     clientSocket = socket;
     /*一个rtp包最大大小不会超过16个bit也就是65535*/
     buffer = new uint8_t[65535];
-    nalUintData = new uint8_t[NALReader::MAX_BUFFER_SIZE];
+    // nalUintData = new uint8_t[NALReader::MAX_BUFFER_SIZE];
 
     return 0;
 }
 
 RtspReceiveData::~RtspReceiveData() {
     delete[] buffer;
-    delete[] nalUintData;
+    // delete[] nalUintData;
 }
 
 int RtspReceiveData::receiveData(const std::string &packet) {
@@ -156,17 +157,19 @@ int RtspReceiveData::disposeRtpData(uint8_t *rtpBuffer, uint32_t rtpBufferSize, 
             if (start == 1 && end == 0) {
                 *(rs.currentPtr - 1) = forbidden_zero_bit << 7 | (nal_ref_idc << 5) | nal_unit_type;
                 /*这里手动给nalu加上起始码，固定0001*/
-                memcpy(nalUintData, startCode, 4);
-                memcpy(nalUintData + 4, rs.currentPtr - 1, length + 1);
-                nalUintOffset = 4 + length + 1;
+
+
+                memcpy(videoReader.bufferStart, startCode, 4);
+                memcpy(videoReader.bufferStart + 4, rs.currentPtr - 1, length + 1);
+                videoReader.blockBufferSize = 4 + length + 1;
             } else if (start == 0 && end == 0) {
-                memcpy(nalUintData + nalUintOffset, rs.currentPtr, length);
-                nalUintOffset += length;
+                memcpy(videoReader.bufferStart + videoReader.blockBufferSize, rs.currentPtr, length);
+                videoReader.blockBufferSize += length;
             } else if (start == 0 && end == 1) {
-                memcpy(nalUintData + nalUintOffset, rs.currentPtr, length);
-                nalUintOffset += length;
+                memcpy(videoReader.bufferStart + videoReader.blockBufferSize, rs.currentPtr, length);
+                videoReader.blockBufferSize += length;
                 /*这里还可以依靠mark标记来确定一帧的最后一个slice*/
-                ret = videoReader.getVideoFrame2(picture, nalUintData, nalUintOffset, 4);
+                ret = videoReader.getVideoFrame2(picture, videoReader.bufferStart, videoReader.blockBufferSize, 4);
                 if (ret < 0) {
                     fprintf(stderr, "nalReader.getPicture 失败\n");
                     return -1;
@@ -196,7 +199,6 @@ int RtspReceiveData::disposeRtpData(uint8_t *rtpBuffer, uint32_t rtpBufferSize, 
                 fprintf(stderr, "nalReader.getPicture 失败\n");
                 return -1;
             }
-
 
             if (picture->pictureFinishFlag) {
                 ret = ts.writeTransportStream(picture);

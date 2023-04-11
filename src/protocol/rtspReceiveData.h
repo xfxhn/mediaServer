@@ -48,8 +48,8 @@ private:
 
     TransportPacket ts;
     uint8_t *buffer{nullptr};
-    uint8_t *nalUintData{nullptr};
-    uint32_t nalUintOffset{0};
+//    uint8_t *nalUintData{nullptr};
+//    uint32_t nalUintOffset{0};
 
 
     NALReader videoReader;

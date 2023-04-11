@@ -5,6 +5,7 @@
 #include <string>
 #include <cstdint>
 #include <fstream>
+#include <chrono>
 #include "demuxPacket.h"
 #include "NALReader.h"
 #include "adtsReader.h"
@@ -23,6 +24,7 @@ struct Packet {
 
 class AVPacket {
 private:
+    std::chrono::time_point<std::chrono::high_resolution_clock> start;
     std::ifstream fs;
     std::string path;
     uint32_t currentPacket;
@@ -36,6 +38,9 @@ private:
     AdtsReader audioReader;
     AdtsHeader header;
 public:
+
+    int test();
+
     int init(const std::string &dir, uint32_t transportStreamPacketNumber);
 
     static Packet *allocPacket();

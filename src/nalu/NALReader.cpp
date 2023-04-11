@@ -244,11 +244,11 @@ int NALReader::getVideoParameter() {
 
 void NALReader::resetBuffer() {
     uint32_t remainingByte = bufferEnd - bufferPosition;
+    blockBufferSize = remainingByte;
+    bufferEnd = bufferStart + remainingByte;
+    bufferPosition = bufferEnd;
     if (remainingByte > 0) {
         memcpy(bufferStart, bufferPosition, remainingByte);
-        blockBufferSize = remainingByte;
-        bufferEnd = bufferStart + remainingByte;
-        bufferPosition = bufferEnd;
     }
 
 }
@@ -310,6 +310,8 @@ int NALReader::getVideoFrame3(NALPicture *&picture) {
 
         getVideoFrame2(picture, data, size, 0);
         bufferPosition = pos2;
+    } else {
+        bufferPosition = bufferEnd;
     }
     return ret;
 }

@@ -17,6 +17,7 @@ add_subdirectory(transportStream)
 add_executable(mediaServer test.cpp)
 target_include_directories(mediaServer
         PRIVATE ${PROJECT_SOURCE_DIR}/src/server
+        PRIVATE ${PROJECT_SOURCE_DIR}/src/protocol
         PRIVATE ${PROJECT_SOURCE_DIR}/src/nalu
         )
 
