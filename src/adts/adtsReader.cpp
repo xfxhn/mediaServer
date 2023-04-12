@@ -51,17 +51,6 @@ int AdtsReader::getAudioParameter() {
     return 0;
 }
 
-void AdtsReader::resetBuffer() {
-    /*还剩多少字节未读取*/
-    uint32_t remainingByte = bufferEnd - bufferPosition;
-    blockBufferSize = remainingByte;
-    bufferEnd = buffer + remainingByte;
-    bufferPosition = bufferEnd;
-    if (remainingByte > 0) {
-        memcpy(buffer, bufferPosition, remainingByte);
-    }
-
-}
 
 int AdtsReader::findFrame(AdtsHeader &header) {
     int ret;
@@ -123,8 +112,19 @@ void AdtsReader::putData(uint8_t *data, uint32_t size) {
     bufferEnd = buffer + blockBufferSize;
 }
 
+void AdtsReader::resetBuffer() {
+    if (resetFlag) {
+        uint32_t remainingByte = bufferEnd - bufferPosition;
+        blockBufferSize = remainingByte;
+        memcpy(buffer, bufferPosition, remainingByte);
+        resetFlag = false;
+    }
+
+}
+
 int AdtsReader::getAudioFrame2(AdtsHeader &header) {
     int ret;
+
     if (buffer == nullptr) {
         fprintf(stderr, "请初始化\n");
         return -1;
@@ -152,36 +152,10 @@ int AdtsReader::getAudioFrame2(AdtsHeader &header) {
         header.data = &buffer[MAX_HEADER_SIZE];
         header.size = frameLength - MAX_HEADER_SIZE;
         bufferPosition = buffer + frameLength;
-        disposeAudio(header, header.data, header.size);
-    } else {
-        bufferPosition = bufferEnd;
-    }
 
-//    while (true) {
-//        ReadStream rs(buffer, blockBufferSize);
-//        if (rs.getMultiBit(12) != 0xFFF) {
-//            fprintf(stderr, "格式不对,不等于0xFFF\n");
-//            return -1;
-//        }
-//
-//        ret = header.adts_fixed_header(rs);
-//        if (ret < 0) {
-//            fprintf(stderr, "解析adts fixed header失败\n");
-//            return -1;
-//        }
-//        header.adts_variable_header(rs);
-//
-//        uint16_t frameLength = header.frame_length;
-//
-//        if (blockBufferSize >= frameLength) {
-//            header.data = &buffer[MAX_HEADER_SIZE];
-//            header.size = frameLength - MAX_HEADER_SIZE;
-//            bufferPosition = buffer + frameLength;
-//            disposeAudio(header, header.data, header.size);
-//            break;
-//        }
-//
-//    }
+        disposeAudio(header, header.data, header.size);
+        resetFlag = true;
+    }
 
 
     return 0;

@@ -40,7 +40,7 @@ int AVPacket::getTransportStreamData() {
     std::chrono::duration<uint64_t, std::milli> elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
             std::chrono::high_resolution_clock::now() - start);
     /*需要视频的dts和音频的dts都小于这个时间才会去读取*/
-    if (header.dts > elapsed.count() || picture->dts > elapsed.count()) {
+    if (header.pts > elapsed.count() || picture->dts > elapsed.count()) {
         return 1;
     }
 
@@ -56,7 +56,7 @@ int AVPacket::getTransportStreamData() {
                 --currentPacket;
                 fs.clear();
                 fprintf(stderr, "没有下个文件,等待一会儿\n");
-                std::this_thread::sleep_for(std::chrono::milliseconds(500));
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
                 continue;
             }
 
@@ -78,7 +78,7 @@ int AVPacket::getTransportStreamData() {
         } else if (size < TRANSPORT_STREAM_PACKETS_SIZE) {
             fs.clear();
             fprintf(stderr, "size < TRANSPORT_STREAM_PACKETS_SIZE %d, video\n", size);
-            std::this_thread::sleep_for(std::chrono::milliseconds(500));
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
             continue;
         }
         /*走到这里肯定有188个字节*/
@@ -109,14 +109,18 @@ int AVPacket::getTransportStreamData() {
 int AVPacket::test() {
     int ret;
     Packet *packet = allocPacket();
-
+    int i = 0;
     while (true) {
+        ++i;
+        if (i == 370) {
+            i = 370;
+        }
         ret = readFrame(packet);
         if (ret < 0) {
             return -1;
         }
 
-        std::cout << packet->type << std::endl;
+        std::cout << packet->type << " ---  " << i << std::endl;
     }
 
 
@@ -133,6 +137,7 @@ int AVPacket::readFrame(Packet *packet) {
     audioReader.resetBuffer();
 
     while (true) {
+        /*有可能这个时候读ts tag包的是video，但是这个ts tag包凑不够一帧，下个ts tag包是audio*/
         ret = getTransportStreamData();
         if (ret < 0) {
             fprintf(stderr, "getTransportStreamData 失败\n");
@@ -159,9 +164,8 @@ int AVPacket::readFrame(Packet *packet) {
                 packet->size = picture->size;
                 packet->type = "video";
                 break;
-            } else {
-                videoReader.resetBuffer();
             }
+
 
         } else if (ret == AUDIO_PID) {
             ret = audioReader.getAudioFrame2(header);
@@ -177,8 +181,6 @@ int AVPacket::readFrame(Packet *packet) {
                 packet->size = header.size;
                 packet->type = "audio";
                 break;
-            } else {
-                audioReader.resetBuffer();
             }
         }
 

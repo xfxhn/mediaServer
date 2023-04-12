@@ -19,6 +19,7 @@ public:
     /*给外部提供参数信息用的*/
     AdtsHeader parameter;
 private:
+    bool resetFlag{true};
     uint32_t currentPacket{0};
     std::string path;
 
@@ -41,6 +42,7 @@ public:
     int getAudioParameter();
 
     int init1(const std::string &dir, uint32_t transportStreamPacketNumber);
+
     int init2();
 
     int findFrame(AdtsHeader &header);

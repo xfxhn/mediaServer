@@ -27,14 +27,12 @@ class NALReader {
 public:
 
     static constexpr uint32_t MAX_BUFFER_SIZE{1024 * 1024};
-    /*bool pictureFinishFlag{ false };*/
     NALSeqParameterSet sps;
     NALPictureParameterSet pps;
     uint8_t spsData[50];
     uint8_t ppsData[50];
     uint8_t spsSize{0};
     uint8_t ppsSize{0};
-    /*uint32_t remainingByte{0};*/
 
 
     uint8_t *bufferStart{nullptr};
@@ -42,7 +40,7 @@ public:
     uint8_t *bufferEnd{nullptr};
     uint32_t blockBufferSize{0};
 private:
-
+    bool resetFlag{true};
     std::string path;
 
 //    NALSliceHeader sliceHeader;
@@ -59,7 +57,6 @@ private:
 
 private:
     NALPicture *unoccupiedPicture{nullptr};
-//    bool finishFlag{false};
     NALHeader nalUnitHeader;
     NALDecodedPictureBuffer gop;
 

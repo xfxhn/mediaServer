@@ -149,11 +149,6 @@ int NALReader::readNalUint(uint8_t *&data, uint32_t &size) {
     return 0;
 }
 
-void NALReader::putData(uint8_t *data, uint32_t size) {
-    memcpy(bufferStart + blockBufferSize, data, size);
-    blockBufferSize += size;
-    bufferEnd = bufferStart + blockBufferSize;
-}
 
 int NALReader::findNALU(uint8_t *&pos1, uint8_t *&pos2, int &startCodeLen1, int &startCodeLen2) {
 
@@ -242,14 +237,22 @@ int NALReader::getVideoParameter() {
     return 0;
 }
 
+void NALReader::putData(uint8_t *data, uint32_t size) {
+    memcpy(bufferStart + blockBufferSize, data, size);
+    blockBufferSize += size;
+    bufferEnd = bufferStart + blockBufferSize;
+}
+
 void NALReader::resetBuffer() {
-    uint32_t remainingByte = bufferEnd - bufferPosition;
-    blockBufferSize = remainingByte;
-    bufferEnd = bufferStart + remainingByte;
-    bufferPosition = bufferEnd;
-    if (remainingByte > 0) {
+    /*有可能找到了，但是bufferEnd - bufferPosition刚好=0*/
+    if (resetFlag) {
+        uint32_t remainingByte = bufferEnd - bufferPosition;
+        blockBufferSize = remainingByte;
+
         memcpy(bufferStart, bufferPosition, remainingByte);
+        resetFlag = false;
     }
+
 
 }
 
@@ -297,6 +300,7 @@ int NALReader::getVideoFrame2(NALPicture *&picture, uint8_t *data, uint32_t size
 
 int NALReader::getVideoFrame3(NALPicture *&picture) {
     int ret;
+
     uint8_t *pos1 = nullptr;
     uint8_t *pos2 = nullptr;
     int startCodeLen1 = 0;
@@ -308,10 +312,16 @@ int NALReader::getVideoFrame3(NALPicture *&picture) {
         uint8_t *data = pos1 + startCodeLen1;
         uint32_t size = pos2 - data;
 
-        getVideoFrame2(picture, data, size, 0);
+        ret = getVideoFrame2(picture, data, size, 0);
+        if (ret < 0) {
+            return ret;
+        }
+        /*找到一个nalu，才可以去重置这个内存*/
+        resetFlag = true;
         bufferPosition = pos2;
-    } else {
-        bufferPosition = bufferEnd;
+        if (picture->finishFlag == false) {
+            resetBuffer();
+        }
     }
     return ret;
 }
