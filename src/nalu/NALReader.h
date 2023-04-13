@@ -72,6 +72,7 @@ public:
     void putData(uint8_t *data, uint32_t size);
 
     int getVideoParameter();
+    int getParameter();
 
 
     int init1(const std::string &dir, uint32_t transportStreamPacketNumber, int timestamp);
@@ -100,7 +101,7 @@ private:
 
     int test1(NALPicture *picture, uint8_t *data, uint32_t size, uint8_t startCodeLength);
 
-    int findNALU(uint8_t *&pos1, uint8_t *&pos2, int &startCodeLen1, int &startCodeLen2);
+    int findNALU(uint8_t *&pos1, uint8_t *&pos2, int &startCodeLen1, int &startCodeLen2) const;
 
     int getTransportStreamData();
 

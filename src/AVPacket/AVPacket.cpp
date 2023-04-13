@@ -1,10 +1,10 @@
 ﻿
 
-#include "packet.h"
+#include "AVPacket.h"
 #include <thread>
 #include <filesystem>
 #include "readStream.h"
-#include "NALPicture.h"
+//#include "NALPicture.h"
 
 /*存储一个启动时间，然后在每个要发送的函数里获取当前时间，用当前的这个时间减去启动时间
  * 然后用这个时间和dts作比较，如果dts大于这个时间，就不发送
@@ -22,8 +22,9 @@ int AVPacket::init(const std::string &dir, uint32_t transportStreamPacketNumber)
         fprintf(stderr, "open %s failed\n", name.c_str());
         return -1;
     }
+
+
     videoReader.init2();
-    /*todo*/
     audioReader.init2();
 
 
@@ -32,13 +33,11 @@ int AVPacket::init(const std::string &dir, uint32_t transportStreamPacketNumber)
     return 0;
 }
 
-int AVPacket::getTransportStreamData() {
-
+int AVPacket::getTransportStreamData(bool videoFlag, bool audioFlag) {
 
     int ret = 0;
 
-    std::chrono::duration<uint64_t, std::milli> elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
-            std::chrono::high_resolution_clock::now() - start);
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start);
     /*需要视频的dts和音频的dts都小于这个时间才会去读取*/
     if (header.pts > elapsed.count() || picture->dts > elapsed.count()) {
         return 1;
@@ -88,11 +87,11 @@ int AVPacket::getTransportStreamData() {
             fprintf(stderr, "demux.readVideoFrame失败\n");
             return ret;
         }
-        if (ret == VIDEO_PID) {
+        if (ret == VIDEO_PID && videoFlag) {
             size = rs.size - rs.position;
             videoReader.putData(rs.currentPtr, size);
             break;
-        } else if (ret == AUDIO_PID) {
+        } else if (ret == AUDIO_PID && audioFlag) {
             size = rs.size - rs.position;
             audioReader.putData(rs.currentPtr, size);
             break;
@@ -104,30 +103,56 @@ int AVPacket::getTransportStreamData() {
     return ret;
 }
 
-#include <iostream>
-
-int AVPacket::test() {
+int AVPacket::getParameter() {
     int ret;
-    Packet *packet = allocPacket();
-    int i = 0;
-    while (true) {
-        ++i;
-        if (i == 370) {
-            i = 370;
-        }
-        ret = readFrame(packet);
+
+    bool videoFlag = true;
+    bool audioFlag = true;
+    while (videoFlag || audioFlag) {
+        videoReader.resetBuffer();
+        audioReader.resetBuffer();
+
+        ret = getTransportStreamData(videoFlag, audioFlag);
         if (ret < 0) {
-            return -1;
+            fprintf(stderr, "getTransportStreamData 失败\n");
+            return ret;
         }
+        if (ret == VIDEO_PID && videoFlag) {
+            ret = videoReader.getParameter();
+            if (ret < 0) {
+                fprintf(stderr, "videoReader.getParameter 失败\n");
+                return -1;
+            }
 
-        std::cout << packet->type << " ---  " << i << std::endl;
+            if (ret == 3) {
+                // sps
+                sps = videoReader.sps;
+                spsData = videoReader.spsData;
+                spsSize = videoReader.spsSize;
+            } else if (ret == 4) {
+                // pps
+                pps = videoReader.pps;
+                ppsData = videoReader.ppsData;
+                ppsSize = videoReader.ppsSize;
+                videoFlag = false;
+            }
+        } else if (ret == AUDIO_PID && audioFlag) {
+            ret = audioReader.getParameter();
+            if (ret < 0) {
+                fprintf(stderr, "audioReader.getParameter 失败\n");
+                return -1;
+            }
+            if (ret == 1) {
+                aacHeader = audioReader.parameter;
+                audioFlag = false;
+            }
+        }
     }
-
-
     return 0;
 }
 
-int AVPacket::readFrame(Packet *packet) {
+
+int AVPacket::readFrame(AVPackage *package) {
     int ret;
     header.finishFlag = false;
     picture->finishFlag = false;
@@ -157,15 +182,14 @@ int AVPacket::readFrame(Packet *packet) {
             }
 
             if (picture->finishFlag) {
-                /*给packet赋值*/
-                packet->dts = picture->dts;
-                packet->pts = picture->pts;
-                packet->data1 = picture->data;
-                packet->size = picture->size;
-                packet->type = "video";
+                package->idrFlag = picture->sliceHeader.nalu.IdrPicFlag;
+                package->dts = picture->dts;
+                package->pts = picture->pts;
+                package->data1 = picture->data;
+                package->size = picture->size;
+                package->type = "video";
                 break;
             }
-
 
         } else if (ret == AUDIO_PID) {
             ret = audioReader.getAudioFrame2(header);
@@ -175,11 +199,12 @@ int AVPacket::readFrame(Packet *packet) {
             }
 
             if (header.finishFlag) {
-                packet->dts = header.dts;
-                packet->pts = header.pts;
-                packet->data2 = header.data;
-                packet->size = header.size;
-                packet->type = "audio";
+                package->idrFlag = true;
+                package->dts = header.dts;
+                package->pts = header.pts;
+                package->data2 = header.data;
+                package->size = header.size;
+                package->type = "audio";
                 break;
             }
         }
@@ -188,10 +213,16 @@ int AVPacket::readFrame(Packet *packet) {
     return 0;
 }
 
-Packet *AVPacket::allocPacket() {
-    return new Packet;
+AVPackage *AVPacket::allocPacket() {
+    return new AVPackage;
 }
 
-void AVPacket::freePacket(Packet *packet) {
-    delete packet;
+void AVPacket::freePacket(AVPackage *package) {
+    delete package;
 }
+
+AVPacket::~AVPacket() {
+    fs.close();
+}
+
+

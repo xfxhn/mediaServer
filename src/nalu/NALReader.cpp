@@ -12,23 +12,11 @@ void NALReader::reset() {
     bufferPosition = nullptr;
 
     gop.reset();
-//    fs.read(reinterpret_cast<char *>(bufferStart), MAX_BUFFER_SIZE);
-//    blockBufferSize = fs.gcount();
-//    bufferPosition = bufferStart;
-//    bufferEnd = bufferStart + blockBufferSize - 1;
-//
-//
-//    videoDecodeFrameNumber = 0;
-//    videoDecodeIdrFrameNumber = 0;
-//    unoccupiedPicture = nullptr;
-//    gop.reset();
-//    finishFlag = false;
 }
 
 int NALReader::init2() {
 
     bufferStart = new uint8_t[MAX_BUFFER_SIZE];
-    //unoccupiedPicture = allocPicture();
     blockBufferSize = 0;
     return 0;
 }
@@ -150,7 +138,7 @@ int NALReader::readNalUint(uint8_t *&data, uint32_t &size) {
 }
 
 
-int NALReader::findNALU(uint8_t *&pos1, uint8_t *&pos2, int &startCodeLen1, int &startCodeLen2) {
+int NALReader::findNALU(uint8_t *&pos1, uint8_t *&pos2, int &startCodeLen1, int &startCodeLen2) const {
 
     if (!bufferStart) {
         fprintf(stderr, "请初始化\n");
@@ -237,6 +225,52 @@ int NALReader::getVideoParameter() {
     return 0;
 }
 
+int NALReader::getParameter() {
+    int ret;
+
+    uint8_t *pos1 = nullptr;
+    uint8_t *pos2 = nullptr;
+    int startCodeLen1 = 0;
+    int startCodeLen2 = 0;
+
+
+    ret = findNALU(pos1, pos2, startCodeLen1, startCodeLen2);
+    if (ret == 2) {
+        /*表示找到一个nalu*/
+        uint8_t *data = pos1 + startCodeLen1;
+        uint32_t size = pos2 - data;
+
+        nalUnitHeader.nal_unit(data[0]);
+        if (nalUnitHeader.nal_unit_type == H264_NAL_SPS) {
+            memcpy(spsData, data, size);
+            spsSize = size;
+
+            NALHeader::ebsp_to_rbsp(data, size);
+            ReadStream rs(data, size);
+            sps.seq_parameter_set_data(rs);
+            spsList[sps.seq_parameter_set_id] = sps;
+            ret = 3;
+        } else if (nalUnitHeader.nal_unit_type == H264_NAL_PPS) {
+            memcpy(ppsData, data, size);
+            ppsSize = size;
+
+            NALHeader::ebsp_to_rbsp(data, size);
+            ReadStream rs(data, size);
+            pps.pic_parameter_set_rbsp(rs, spsList);
+            ret = 4;
+        }
+        resetFlag = true;
+        bufferPosition = pos2;
+
+//        if (picture->finishFlag == false) {
+//            resetBuffer();
+//        }
+
+    }
+
+    return ret;
+}
+
 void NALReader::putData(uint8_t *data, uint32_t size) {
     memcpy(bufferStart + blockBufferSize, data, size);
     blockBufferSize += size;
@@ -252,7 +286,6 @@ void NALReader::resetBuffer() {
         memcpy(bufferStart, bufferPosition, remainingByte);
         resetFlag = false;
     }
-
 
 }
 

@@ -6,15 +6,13 @@
 #include <iostream>
 #include "readStream.h"
 
-#include "packet.h"
+#include "AVPacket.h"
 #include "NALReader.h"
 #include <filesystem>
 
 int main() {
-    AVPacket packet;
-    packet.init("./live/test", 0);
-    packet.test();
-    return 0;
+
+
     int ret;
     Server server;
 

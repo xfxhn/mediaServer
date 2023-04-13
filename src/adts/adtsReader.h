@@ -40,6 +40,7 @@ public:
 //    int init(const char *filename);
 
     int getAudioParameter();
+    int getParameter();
 
     int init1(const std::string &dir, uint32_t transportStreamPacketNumber);
 

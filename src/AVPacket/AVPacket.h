@@ -13,18 +13,20 @@
 
 #define TRANSPORT_STREAM_PACKETS_SIZE 188
 
-struct Packet {
+struct AVPackage {
+    bool idrFlag{false};
     std::string type;
     uint64_t dts{0};
     uint64_t pts{0};
+    uint32_t size{0};
     std::vector<Frame> data1;
     uint8_t *data2{nullptr};
-    uint32_t size{0};
 };
 
 class AVPacket {
 private:
     std::chrono::time_point<std::chrono::high_resolution_clock> start;
+    std::chrono::duration<uint64_t, std::milli> elapsed;
     std::ifstream fs;
     std::string path;
     uint32_t currentPacket;
@@ -38,19 +40,29 @@ private:
     AdtsReader audioReader;
     AdtsHeader header;
 public:
-
-    int test();
+    NALSeqParameterSet sps;
+    NALPictureParameterSet pps;
+    uint8_t *spsData{nullptr};
+    uint8_t *ppsData{nullptr};
+    uint8_t spsSize{0};
+    uint8_t ppsSize{0};
+    AdtsHeader aacHeader;
+public:
 
     int init(const std::string &dir, uint32_t transportStreamPacketNumber);
 
-    static Packet *allocPacket();
+    int getParameter();
 
-    static void freePacket(Packet *packet);
+    static AVPackage *allocPacket();
 
-    int readFrame(Packet *packet);
+    static void freePacket(AVPackage *package);
+
+    int readFrame(AVPackage *package);
+
+    ~AVPacket();
 
 private:
-    int getTransportStreamData();
+    int getTransportStreamData(bool videoFlag = true, bool audioFlag = true);
 };
 
 
