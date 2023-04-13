@@ -1,6 +1,6 @@
 ﻿
 #include "FLVScriptTag.h"
-
+#include <cstring>
 
 char a[] = "width";
 static Item list[7] = {

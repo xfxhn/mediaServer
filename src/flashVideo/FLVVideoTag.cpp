@@ -1,6 +1,7 @@
 ﻿
 #include "FLVVideoTag.h"
 #include <string>
+#include <cstring>
 
 int FLVVideoTag::writeData(WriteStream &ws) {
     ws.writeMultiBit(4, frameType);

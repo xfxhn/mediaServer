@@ -19,8 +19,8 @@ add_subdirectory(flashVideo)
 add_executable(mediaServer test.cpp)
 target_include_directories(mediaServer
         PRIVATE ${PROJECT_SOURCE_DIR}/src/server
-        PRIVATE ${PROJECT_SOURCE_DIR}/src/protocol
-        PRIVATE ${PROJECT_SOURCE_DIR}/src/nalu
+        #[[PRIVATE ${PROJECT_SOURCE_DIR}/src/protocol
+        PRIVATE ${PROJECT_SOURCE_DIR}/src/nalu]]
         )
 
 target_link_libraries(mediaServer PRIVATE server)
