@@ -16,6 +16,7 @@
 struct AVPackage {
     bool idrFlag{false};
     std::string type;
+    double fps{0};
     uint64_t dts{0};
     uint64_t pts{0};
     uint32_t size{0};

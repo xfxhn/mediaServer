@@ -42,6 +42,14 @@ int HttpFlv::init(std::filesystem::path &path, SOCKET socket) {
     videoBuffer = new uint8_t[NALReader::MAX_BUFFER_SIZE];
 
     package = AVPacket::allocPacket();
+
+
+    /*   fs.open("./aaaaa.flv", std::ios::binary | std::ios::out | std::ios::trunc);
+       if (!fs.is_open()) {
+           fprintf(stderr, "打开失败\n");
+       }*/
+
+
     return 0;
 }
 
@@ -92,12 +100,14 @@ int HttpFlv::sendHeader() {
     WriteStream ws(videoBuffer, FLVHeader::size);
     FLVHeader header;
     header.write(ws);
-    ret = TcpSocket::sendData(clientSocket, videoBuffer, 9);
+    ret = TcpSocket::sendData(clientSocket, videoBuffer, (int) ws.bufferSize);
     if (ret < 0) {
         fprintf(stderr, "发送数据失败 FLV header\n");
         return ret;
     }
     previousTagSize = 0;
+
+
     return 0;
 }
 
@@ -115,13 +125,14 @@ int HttpFlv::sendMetadata() {
         return ret;
     }
 
-    constexpr int metaSize = 138;
-    WriteStream ws(videoBuffer, TAG_SIZE + TAG_HEADER_SIZE + metaSize);
+
+    constexpr int META_SIZE = 156;
+    WriteStream ws(videoBuffer, TAG_SIZE + TAG_HEADER_SIZE + META_SIZE);
     /*写入上个tag的大小*/
     ws.writeMultiBit(32, previousTagSize);
 
     FLVTagHeader tagHeader;
-    tagHeader.setConfig(SCRIPT, metaSize, 0);
+    tagHeader.setConfig(SCRIPT, META_SIZE, 0);
     tagHeader.write(ws);
 
 
@@ -137,7 +148,8 @@ int HttpFlv::sendMetadata() {
         return ret;
     }
 
-    previousTagSize = TAG_HEADER_SIZE + metaSize;
+
+    previousTagSize = TAG_HEADER_SIZE + META_SIZE;
     return 0;
 }
 
@@ -193,7 +205,6 @@ int HttpFlv::sendVideoSequenceHeader(AVPacket &packet) {
         fprintf(stderr, "发送数据失败\n");
         return ret;
     }
-
     previousTagSize = TAG_HEADER_SIZE + AVC_CONFIG_SIZE + packet.spsSize + packet.ppsSize;
     return 0;
 }
@@ -213,8 +224,8 @@ int HttpFlv::sendAudioSequenceHeader(AVPacket &packet) {
 
     FLVAudioTag audioTag;
     audioTag.setConfig(0);
-    const uint8_t profile = packet.aacHeader.ID == 1 ? packet.aacHeader.profile + 1 : packet.aacHeader.profile;
-    audioTag.setConfigurationRecord(profile, packet.aacHeader.sampling_frequency_index,
+
+    audioTag.setConfigurationRecord(packet.aacHeader.profile + 1, packet.aacHeader.sampling_frequency_index,
                                     packet.aacHeader.channel_configuration);
     audioTag.writeConfig(ws);
     ret = TcpSocket::sendData(clientSocket, videoBuffer, (int) ws.bufferSize);
@@ -222,7 +233,6 @@ int HttpFlv::sendAudioSequenceHeader(AVPacket &packet) {
         fprintf(stderr, "发送数据失败\n");
         return ret;
     }
-
     previousTagSize = TAG_HEADER_SIZE + AAC_CONFIG_SIZE;
 
     return 0;
@@ -237,13 +247,13 @@ int HttpFlv::sendData() {
         return ret;
     }
 
-
     while (true) {
         ret = packet.readFrame(package);
         if (ret < 0) {
             fprintf(stderr, "packet.readFrame 失败\n");
             return -1;
         }
+        fprintf(stderr, "1111\n");
         if (package->type == "video") {
             ret = sendVideoData();
             if (ret < 0) {
@@ -272,7 +282,7 @@ int HttpFlv::sendAudioData() {
     ws.writeMultiBit(32, previousTagSize);
 
     FLVTagHeader tagHeader;
-    tagHeader.setConfig(AUDIO, AAC_CONFIG_SIZE, package->pts);
+    tagHeader.setConfig(AUDIO, AAC_CONFIG_SIZE + package->size, package->pts);
     tagHeader.write(ws);
 
 
@@ -280,16 +290,17 @@ int HttpFlv::sendAudioData() {
     audioTag.setConfig(1);
     audioTag.writeData(ws, package->data2, package->size);
 
+
     ret = TcpSocket::sendData(clientSocket, audioBuffer, (int) ws.bufferSize);
     if (ret < 0) {
         fprintf(stderr, "发送数据失败\n");
         return ret;
     }
-
     previousTagSize = TAG_HEADER_SIZE + AAC_CONFIG_SIZE + package->size;
 
     return 0;
 }
+
 
 int HttpFlv::sendVideoData() {
     int ret;
@@ -300,21 +311,21 @@ int HttpFlv::sendVideoData() {
     ws.writeMultiBit(32, previousTagSize);
 
     FLVTagHeader tagHeader;
-    tagHeader.setConfig(VIDEO, AVC_CONFIG_SIZE + package->size, package->dts);
+    tagHeader.setConfig(VIDEO, AVC_CONFIG_SIZE + package->size + package->data1.size() * 4, package->dts);
     tagHeader.write(ws);
 
 
     FLVVideoTag videoTag;
     /* 5 */
-    videoTag.setConfig(package->idrFlag ? 1 : 2, AVC_NALU, package->pts - package->dts);
+    videoTag.setConfig(package->idrFlag ? 1 : 2, AVC_NALU, (package->pts + (int) package->fps * 3) - package->dts);
     videoTag.writeData(ws);
 
     for (auto &i: package->data1) {
         ws.writeMultiBit(32, i.nalUintSize);
         memcpy(ws.currentPtr, i.data, i.nalUintSize);
         ws.setBytePtr(i.nalUintSize);
-    }
 
+    }
     ret = TcpSocket::sendData(clientSocket, videoBuffer, (int) ws.bufferSize);
     if (ret < 0) {
         fprintf(stderr, "发送数据失败\n");

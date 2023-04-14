@@ -183,6 +183,7 @@ int AVPacket::readFrame(AVPackage *package) {
 
             if (picture->finishFlag) {
                 package->idrFlag = picture->sliceHeader.nalu.IdrPicFlag;
+                package->fps = picture->sliceHeader.sps.fps;
                 package->dts = picture->dts;
                 package->pts = picture->pts;
                 package->data1 = picture->data;

@@ -2,7 +2,6 @@
 #include "FLVScriptTag.h"
 #include <cstring>
 
-char a[] = "width";
 static Item list[7] = {
         {"width",           number_marker},
         {"height",          number_marker},

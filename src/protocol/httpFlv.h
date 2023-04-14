@@ -5,11 +5,14 @@
 #include <string>
 #include <cstdint>
 #include <filesystem>
+#include <fstream>
 #include "TcpSocket.h"
 #include "AVPacket.h"
 
 class HttpFlv {
 private:
+
+
     AVPackage *package{nullptr};
     std::string mimeType{"video/x-flv"};
     int transportStreamPacketNumber{0};
