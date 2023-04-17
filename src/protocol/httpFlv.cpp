@@ -23,7 +23,7 @@ int HttpFlv::init(std::filesystem::path &path, SOCKET socket) {
         return -1;
     }
 
-
+    dir = path.string();
     for (const std::filesystem::directory_entry &entry: std::filesystem::directory_iterator(path)) {
         std::string extension = entry.path().extension().string();
         if (extension == ".ts") {
@@ -33,7 +33,6 @@ int HttpFlv::init(std::filesystem::path &path, SOCKET socket) {
             int number = std::stoi(filename.substr(start, end - start));
             if (number > transportStreamPacketNumber) {
                 transportStreamPacketNumber = number;
-                dir = path.string();
             }
         }
     }
@@ -42,12 +41,6 @@ int HttpFlv::init(std::filesystem::path &path, SOCKET socket) {
     videoBuffer = new uint8_t[NALReader::MAX_BUFFER_SIZE];
 
     package = AVPacket::allocPacket();
-
-
-    /*   fs.open("./aaaaa.flv", std::ios::binary | std::ios::out | std::ios::trunc);
-       if (!fs.is_open()) {
-           fprintf(stderr, "打开失败\n");
-       }*/
 
 
     return 0;
@@ -60,6 +53,7 @@ int HttpFlv::disposeFlv() {
         fprintf(stderr, "sendHeader 失败\n");
         return ret;
     }
+
     ret = sendMetadata();
     if (ret < 0) {
         fprintf(stderr, "sendMetadata 失败\n");
@@ -85,10 +79,9 @@ int HttpFlv::sendHeader() {
 
     sprintf(reinterpret_cast<char *>(videoBuffer),
             "HTTP/1.1 200 OK\r\n"
-            "Content-Type: %s\r\n"
+            "Content-Type: video/x-flv\r\n"
             "Connection: keep-alive\r\n"
-            "\r\n",
-            mimeType.c_str()
+            "\r\n"
     );
     ret = TcpSocket::sendData(clientSocket, videoBuffer, (int) strlen(reinterpret_cast<char *>(videoBuffer)));
     if (ret < 0) {
@@ -96,7 +89,7 @@ int HttpFlv::sendHeader() {
         return ret;
     }
 
-    /*包含了最后四个字节=0  previousTagSize*/
+
     WriteStream ws(videoBuffer, FLVHeader::size);
     FLVHeader header;
     header.write(ws);
@@ -253,7 +246,6 @@ int HttpFlv::sendData() {
             fprintf(stderr, "packet.readFrame 失败\n");
             return -1;
         }
-        fprintf(stderr, "1111\n");
         if (package->type == "video") {
             ret = sendVideoData();
             if (ret < 0) {
@@ -317,7 +309,8 @@ int HttpFlv::sendVideoData() {
 
     FLVVideoTag videoTag;
     /* 5 */
-    videoTag.setConfig(package->idrFlag ? 1 : 2, AVC_NALU, (package->pts + (int) package->fps * 3) - package->dts);
+    /* + (int) package->fps * 3)*/
+    videoTag.setConfig(package->idrFlag ? 1 : 2, AVC_NALU, (package->pts + 80 - package->dts));
     videoTag.writeData(ws);
 
     for (auto &i: package->data1) {

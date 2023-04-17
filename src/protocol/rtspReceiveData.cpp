@@ -27,7 +27,7 @@ int RtspReceiveData::init(SOCKET socket, const std::string &path, uint8_t video,
         return ret;
     }
 
-    videoReader.init2();
+    videoReader.init();
     picture = videoReader.allocPicture();
     if (picture == nullptr) {
         fprintf(stderr, "获取frame失败\n");
@@ -40,25 +40,23 @@ int RtspReceiveData::init(SOCKET socket, const std::string &path, uint8_t video,
     clientSocket = socket;
     /*一个rtp包最大大小不会超过16个bit也就是65535*/
     buffer = new uint8_t[65535];
-    // nalUintData = new uint8_t[NALReader::MAX_BUFFER_SIZE];
 
     return 0;
 }
 
 RtspReceiveData::~RtspReceiveData() {
     delete[] buffer;
-    // delete[] nalUintData;
 }
 
-int RtspReceiveData::receiveData(const std::string &packet) {
+int RtspReceiveData::receiveData(const std::string &msg) {
     int ret;
     if (buffer == nullptr) {
         fprintf(stderr, "请初始化\n");
         return -1;
     }
 
-    memcpy(buffer, packet.c_str(), packet.length());
-    uint32_t bufferSize = packet.length();
+    memcpy(buffer, msg.c_str(), msg.length());
+    uint32_t bufferSize = msg.length();
 
     uint8_t *rtpBuffer = nullptr;
     uint32_t rtpBufferSize = 0;

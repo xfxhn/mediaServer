@@ -48,8 +48,6 @@ private:
 
     TransportPacket ts;
     uint8_t *buffer{nullptr};
-//    uint8_t *nalUintData{nullptr};
-//    uint32_t nalUintOffset{0};
 
 
     NALReader videoReader;
@@ -66,7 +64,7 @@ public:
 
     int writeAudioData(uint8_t audioObjectType, uint8_t samplingFrequencyIndex, uint8_t channelConfiguration);
 
-    int receiveData(const std::string &packet);
+    int receiveData(const std::string &msg);
 
     ~RtspReceiveData();
 

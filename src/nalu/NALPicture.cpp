@@ -191,7 +191,9 @@ int NALPicture::decoding_process_for_picture_order_count_type_2() {
 }
 
 void NALPicture::reset() {
+    decodeFrameNumber = 0;
     pictureFinishFlag = false;
+    finishFlag = false;
     useFlag = false;
     size = 0;
     dts = 0;
@@ -224,6 +226,7 @@ void NALPicture::reset() {
 }
 
 NALPicture::~NALPicture() {
+    data.clear();
     /*while (!data.empty()) {
         uint8_t *buf = data.back().data;
         delete[] buf;

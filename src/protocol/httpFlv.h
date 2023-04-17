@@ -14,7 +14,6 @@ private:
 
 
     AVPackage *package{nullptr};
-    std::string mimeType{"video/x-flv"};
     int transportStreamPacketNumber{0};
     std::string dir;
     SOCKET clientSocket;

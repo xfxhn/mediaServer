@@ -51,7 +51,7 @@ private:
     uint32_t maxFrameRtpPacketSize{0};
 public:
     /*const char *ip, uint16_t port, */
-    int init(uint32_t audioSize, uint8_t type);
+    int init();
 
     int sendVideoFrame(SOCKET clientSocket, uint8_t *data, uint32_t size, uint8_t flag, uint8_t channel);
 

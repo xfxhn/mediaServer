@@ -16,7 +16,7 @@ add_subdirectory(transportStream)
 add_subdirectory(flashVideo)
 
 
-add_executable(mediaServer test.cpp)
+add_executable(mediaServer main.cpp)
 target_include_directories(mediaServer
         PRIVATE ${PROJECT_SOURCE_DIR}/src/server
         #[[PRIVATE ${PROJECT_SOURCE_DIR}/src/protocol

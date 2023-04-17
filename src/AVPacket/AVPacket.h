@@ -20,6 +20,7 @@ struct AVPackage {
     uint64_t dts{0};
     uint64_t pts{0};
     uint32_t size{0};
+    uint32_t decodeFrameNumber{0};
     std::vector<Frame> data1;
     uint8_t *data2{nullptr};
 };

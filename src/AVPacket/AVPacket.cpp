@@ -4,7 +4,6 @@
 #include <thread>
 #include <filesystem>
 #include "readStream.h"
-//#include "NALPicture.h"
 
 /*存储一个启动时间，然后在每个要发送的函数里获取当前时间，用当前的这个时间减去启动时间
  * 然后用这个时间和dts作比较，如果dts大于这个时间，就不发送
@@ -16,16 +15,16 @@ int AVPacket::init(const std::string &dir, uint32_t transportStreamPacketNumber)
 
 
     std::string name = "/test" + std::to_string(currentPacket) + ".ts";
-    printf("读取%s文件 video init\n", name.c_str());
+    printf("读取%s文件\n", name.c_str());
     fs.open(path + name, std::ios::out | std::ios::binary);
     if (!fs.is_open()) {
-        fprintf(stderr, "open %s failed\n", name.c_str());
+        fprintf(stderr, "111  open %s failed\n", (path + name).c_str());
         return -1;
     }
 
 
-    videoReader.init2();
-    audioReader.init2();
+    videoReader.init();
+    audioReader.init();
 
 
     picture = videoReader.allocPicture();
@@ -46,6 +45,7 @@ int AVPacket::getTransportStreamData(bool videoFlag, bool audioFlag) {
     std::string name;
     uint32_t size = 0;
     while (true) {
+
         fs.read(reinterpret_cast<char *>(transportStreamBuffer + size), TRANSPORT_STREAM_PACKETS_SIZE - size);
         size += fs.gcount();
         if (size == 0) {
@@ -185,7 +185,7 @@ int AVPacket::readFrame(AVPackage *package) {
                 package->idrFlag = picture->sliceHeader.nalu.IdrPicFlag;
                 package->fps = picture->sliceHeader.sps.fps;
                 package->dts = picture->dts;
-                package->pts = picture->pts;
+                package->decodeFrameNumber = picture->decodeFrameNumber;
                 package->data1 = picture->data;
                 package->size = picture->size;
                 package->type = "video";

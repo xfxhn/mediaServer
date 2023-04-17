@@ -6,13 +6,15 @@
 #include <cstring>
 #include "writeStream.h"
 
+#define RTP_PAYLOAD_TYPE_H264   96
+#define RTP_PAYLOAD_TYPE_AAC    97
 
 #define RTP_MAX_PKT_SIZE        1400
 
 #define RTP_HEADER_SIZE         12
 
 /*const char *_ip, uint16_t _port,*/
-int RtpPacket::init(uint32_t maxFrameSize, uint8_t type) {
+int RtpPacket::init() {
     /*ip = _ip;
     port = _port;
     addr.sin_family = AF_INET;
@@ -21,10 +23,11 @@ int RtpPacket::init(uint32_t maxFrameSize, uint8_t type) {
 
     /*rtp头加上一帧的最大数据加上载荷数据*/
     /*4是最大的AU头大小*/
-    maxFrameRtpPacketSize = RTP_HEADER_SIZE + maxFrameSize + 4 + 2;
+//    maxFrameRtpPacketSize = RTP_HEADER_SIZE + maxFrameSize + 4 + 2;
+/*4是tcp那个分隔符，2是video表示开始和结尾的标识，4是音频表示有多少个AAC数据的标识*/
+    maxFrameRtpPacketSize = RTP_HEADER_SIZE + RTP_MAX_PKT_SIZE + 4 + 2 + 4;
     /*提前分配内存，避免重新分配*/
     frameBuffer = new uint8_t[maxFrameRtpPacketSize];
-    payloadType = type;
 
     return 0;
 }
@@ -54,9 +57,11 @@ int RtpPacket::writePayload(WriteStream &ws, uint8_t *data, uint32_t dataSize) {
 }
 
 int RtpPacket::sendVideoFrame(SOCKET clientSocket, uint8_t *data, uint32_t size, uint8_t flag, uint8_t channel) {
-    WriteStream ws(frameBuffer, size + RTP_HEADER_SIZE + 4 + 2);
 
     int ret;
+
+    payloadType = RTP_PAYLOAD_TYPE_H264;
+    WriteStream ws(frameBuffer, maxFrameRtpPacketSize);
 
 
     /*Udp协议的MTU为1500，超过了会导致Udp分片传输，而分片的缺点是丢了一个片，整包数据就废弃了*/
@@ -166,9 +171,9 @@ int RtpPacket::sendVideoFrame(SOCKET clientSocket, uint8_t *data, uint32_t size,
 int RtpPacket::sendAudioPacket(SOCKET clientSocket, uint8_t *data, uint32_t size, uint8_t channel) {
 
     int ret;
-
-    marker = 1;/**/
-    WriteStream ws(frameBuffer, size + RTP_HEADER_SIZE + 4 + 4);
+    payloadType = RTP_PAYLOAD_TYPE_AAC;
+    marker = 1;
+    WriteStream ws(frameBuffer, maxFrameRtpPacketSize);
     ws.writeMultiBit(8, '$');
     ws.writeMultiBit(8, channel);
     ws.writeMultiBit(16, size + RTP_HEADER_SIZE + 4);

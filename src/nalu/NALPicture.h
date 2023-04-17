@@ -35,6 +35,7 @@ public:
     uint64_t dts{0};
     uint64_t pts{0};
     uint64_t pcr{0};
+    uint32_t decodeFrameNumber{0};
     /*帧间隔，持续时间,毫秒*/
     int interval{0};
     double duration{0};

@@ -27,14 +27,6 @@ struct SdpInfo {
 };
 
 
-/*struct Info {
-    std::string session;
-    std::string dir;
-    SdpInfo sdp;
-    *//*这个流写入到第几个ts包*//*
-    int transportStreamPacketNumber{0};
-};*/
-
 class ReadStream;
 
 class Rtsp {
@@ -45,19 +37,18 @@ public:
 public:
     int init(SOCKET socket);
 
-    int parseRtsp(std::string &packet, const std::string &data);
+    int parseRtsp(std::string &msg, const std::string &data);
 
     ~Rtsp();
 
 private:
     SdpInfo info;
-    int transportStreamPacketNumber{-1};
+    int transportStreamPacketNumber{0};
     static char response[2048];
     std::map<std::string, std::string> obj;
     SOCKET clientSocket;
 
-    std::thread *videoSendThread{nullptr};
-    std::thread *audioSendThread{nullptr};
+    std::thread *SendThread{nullptr};
 
     uint8_t videoChannel{0};
     uint8_t audioChannel{0};
@@ -68,21 +59,16 @@ private:
     /*这个是当前rtsp流生成的唯一id*/
     std::string uniqueSession;
 
-    bool stopVideoSendFlag{true};
-    bool stopAudioSendFlag{true};
+    bool stopSendFlag{true};
 
     /*拉流用的*/
     std::string dir;
     bool flag{false};
 private:
 
-    int receiveData(std::string &packet);
+    int receiveData(std::string &msg);
 
-
-    int sendVideo(uint32_t number);
-
-
-    int sendAudio(uint32_t number);
+    int sendData();
 
     static int parseSdp(const std::string &sdp, SdpInfo &sdpInfo);
 
