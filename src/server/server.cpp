@@ -1,34 +1,38 @@
 ﻿#include "server.h"
 
 #include <cstdio>
-#include "rtspTask.h"
-#include "httpTask.h"
+#include "threadPool/rtspTask.h"
+#include "threadPool/httpTask.h"
+#include "log/logger.h"
 
-
-constexpr unsigned short SERVER_RTSP_PORT = 8554;
-constexpr unsigned short SERVER_HTTP_PORT = 8080;
-
-
-int Server::init() {
-
+int Server::init(int rtspPort, int httpPort) {
+    int ret;
 #if _WIN32
     /*windows 需要初始化socket库*/
     static WSADATA wsadata;
     WSAStartup(MAKEWORD(2, 2), &wsadata);
 #endif
-
+    Logger::getInstance()->setLevel(LOG_TRACE);
 
     pool.init(20);
     pool.start();
 
     rtsp.createSocket();
-    rtsp.bindSocket("0.0.0.0", SERVER_RTSP_PORT);
-    rtsp.listenPort();
+    ret = rtsp.bindSocket("0.0.0.0", rtspPort);
+    if (ret < 0) {
+        return -1;
+    }
 
+    rtsp.listenPort();
+    log_info("启动RTSP，监听%d端口", rtspPort);
 
     http.createSocket();
-    http.bindSocket("0.0.0.0", SERVER_HTTP_PORT);
+    ret = http.bindSocket("0.0.0.0", httpPort);
+    if (ret < 0) {
+        return -1;
+    }
     http.listenPort();
+    log_info("启动HTTP，监听%d端口", httpPort);
     return 0;
 }
 
@@ -53,12 +57,13 @@ int Server::startRtspServer() {
             fprintf(stderr, "accept 失败\n");
             return -1;
         }
+
+
         printf("rtsp client ip:%s,client port:%d\n", rtsp.clientIp, rtsp.clientPort);
         RtspTask *task = new RtspTask(clientSocket); // NOLINT(modernize-use-auto)
         pool.addTask(task);
 
     }
-    //printf("startRtspServer finish\n");
     return 0;
 }
 
@@ -74,15 +79,12 @@ int Server::startHttpServer() {
         pool.addTask(task);
 
     }
-   // printf("startHttpServer finish\n");
 
     return 0;
 }
 
 
 Server::~Server() {
-    printf("server 析构\n");
-    stopFlag = false;
 
 
     if (rtspThread->joinable()) {

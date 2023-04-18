@@ -1,6 +1,7 @@
 ﻿
 #include "UdpSocket.h"
 #include <cstdio>
+#include "log/logger.h"
 
 int UdpSocket::createSocket() {
     /*
@@ -53,7 +54,7 @@ htonl（）将 long 网络字节顺序 转换为 主机字节顺序
      */
     int ret = bind(sock, (sockaddr *) &addr, sizeof(sockaddr));
     if (ret < 0) {
-        fprintf(stderr, "绑定失败");
+        log_error("绑定失败");
         return -1;
     }
     return 0;

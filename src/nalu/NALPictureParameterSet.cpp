@@ -6,7 +6,7 @@
 #include <cmath>
 
 
-#include "readStream.h"
+
 #include "NALSeqParameterSet.h"
 
 int NALPictureParameterSet::pic_parameter_set_rbsp(ReadStream &rs, const NALSeqParameterSet (&spsList)[32]) {

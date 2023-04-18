@@ -5,5 +5,5 @@ add_library(flashVideo FLVHeader.cpp FLVTagHeader.cpp FLVScriptTag.cpp FLVVideoT
 
 
 target_include_directories(flashVideo
-        PRIVATE ${PROJECT_SOURCE_DIR}/src/bitStream
+        PRIVATE ${PROJECT_SOURCE_DIR}/src
         )

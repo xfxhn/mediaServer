@@ -1,5 +1,5 @@
 ﻿#include "NALReader.h"
-#include "readStream.h"
+#include "bitStream/readStream.h"
 
 
 int NALReader::init() {
@@ -145,6 +145,7 @@ int NALReader::getVideoFrame3(NALPicture *&picture) {
     ret = findNALU(pos1, pos2, startCodeLen1, startCodeLen2);
     if (ret == 2) {
         uint8_t *data = pos1 + startCodeLen1;
+        //      uint8_t *data = pos1;
         uint32_t size = pos2 - data;
 
         ret = getVideoFrame2(picture, data, size, 0);

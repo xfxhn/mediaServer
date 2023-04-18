@@ -1,7 +1,7 @@
 ﻿
 #include "http.h"
-#include "util.h"
-
+#include "utils/util.h"
+#include "log/logger.h"
 
 #define TAG_SIZE 4
 #define TAG_HEADER_SIZE 11
@@ -50,16 +50,9 @@ int Http::parse(std::string &packet, const std::string &data) {
             return -1;
         }
     } else if (source.extension() == ".flv") {
-        ret = flv.init(source, clientSocket);
-        if (ret < 0) {
-            responseData(500, "错误");
-            return -1;
-        }
-        ret = flv.disposeFlv();
-        if (ret < 0) {
-            responseData(500, "错误");
-            return -1;
-        }
+        /*这里应该单独开个线程去发送数据*/
+        sendFlVThread = new std::thread(&Http::sendFLV, this, std::ref(source));
+
     } else {
         fprintf(stderr, "不支持这种类型\n");
         ret = responseData(415, "Unsupported Media Type");
@@ -69,6 +62,20 @@ int Http::parse(std::string &packet, const std::string &data) {
     return 0;
 }
 
+int Http::sendFLV(std::filesystem::path &path) {
+    int ret;
+    ret = flv.init(path, clientSocket);
+    if (ret < 0) {
+        responseData(500, "错误");
+        return -1;
+    }
+    ret = flv.disposeFlv();
+    if (ret < 0) {
+        responseData(500, "错误");
+        return -1;
+    }
+    return 0;
+}
 
 int Http::responseData(int status, const std::string &msg) const {
     memset(response, 0, 1024);
@@ -91,6 +98,16 @@ int Http::responseData(int status, const std::string &msg) const {
     }
     return 0;
 }
+
+Http::~Http() {
+    log_info("http 析构");
+
+    if (sendFlVThread && sendFlVThread->joinable()) {
+        sendFlVThread->join();
+    }
+}
+
+
 
 
 

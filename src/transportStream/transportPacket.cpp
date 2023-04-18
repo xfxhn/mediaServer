@@ -6,8 +6,8 @@
 #include <cstring>
 #include <utility>
 #include <filesystem>
-#include "NALPicture.h"
-#include "adtsHeader.h"
+#include "nalu/NALPicture.h"
+#include "adts/adtsHeader.h"
 
 
 #define TRANSPORT_STREAM_PACKETS_SIZE 188

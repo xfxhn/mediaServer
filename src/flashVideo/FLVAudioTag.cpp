@@ -8,16 +8,12 @@ void FLVAudioTag::setConfig(uint8_t packetType) {
     AACPacketType = packetType;
 }
 
-int FLVAudioTag::writeData(WriteStream &ws, uint8_t *data, uint32_t size) const {
+int FLVAudioTag::writeData(WriteStream &ws) const {
     ws.writeMultiBit(4, SoundFormat);
     ws.writeMultiBit(2, SoundRate);
     ws.writeMultiBit(1, SoundSize);
     ws.writeMultiBit(1, SoundType);
     ws.writeMultiBit(8, AACPacketType);
-
-
-    memcpy(ws.currentPtr, data, size);
-    ws.setBytePtr(size);
 
     return 0;
 }

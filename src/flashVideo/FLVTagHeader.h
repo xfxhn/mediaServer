@@ -3,7 +3,7 @@
 #ifndef MEDIASERVER_FLVTAGHEADER_H
 #define MEDIASERVER_FLVTAGHEADER_H
 
-#include "writeStream.h"
+#include "bitStream/writeStream.h"
 
 
 enum {

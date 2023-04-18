@@ -3,8 +3,8 @@
 
 
 #include <cstdint>
+#include "bitStream/readStream.h"
 
-class ReadStream;
 
 class NALSeqParameterSet;
 
@@ -46,7 +46,7 @@ public:
 public:
     int pic_parameter_set_rbsp(ReadStream &rs, const NALSeqParameterSet (&spsList)[32]);
 
-    NALPictureParameterSet& operator=(const NALPictureParameterSet &pps);
+    NALPictureParameterSet &operator=(const NALPictureParameterSet &pps);
 
     ~NALPictureParameterSet();
 };

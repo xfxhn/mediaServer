@@ -3,12 +3,11 @@
 #define MUX_NALSLICEHEADER_H
 
 #include <cstdint>
-
+#include "bitStream/readStream.h"
 #include "NALHeader.h"
 #include "NALSeqParameterSet.h"
 #include "NALPictureParameterSet.h"
 
-class ReadStream;
 
 class NALSeqParameterSet;
 

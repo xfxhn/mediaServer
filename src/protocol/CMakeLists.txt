@@ -3,17 +3,11 @@
 
 add_library(protocol rtsp.cpp rtspSendData.cpp rtspReceiveData.cpp http.cpp httpHls.cpp httpFlv.cpp)
 
-target_include_directories(protocol
-        PUBLIC ${PROJECT_SOURCE_DIR}/src/nalu
-        PUBLIC ${PROJECT_SOURCE_DIR}/src/adts
-        PUBLIC ${PROJECT_SOURCE_DIR}/src/utils
-        PRIVATE ${PROJECT_SOURCE_DIR}/src/socket
-        #[[  PRIVATE ${PROJECT_SOURCE_DIR}/src/bitStream]]
-        PUBLIC ${PROJECT_SOURCE_DIR}/src/transportStream
-        PRIVATE ${PROJECT_SOURCE_DIR}/src/flashVideo
-        PUBLIC ${PROJECT_SOURCE_DIR}/src/AVPacket
-        )
 
+target_include_directories(protocol
+        PRIVATE ${PROJECT_SOURCE_DIR}/src
+        )
+#[[todo 更改每个lib的依赖]]
 target_link_libraries(protocol
         PRIVATE nalu
         PRIVATE adts

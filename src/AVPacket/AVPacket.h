@@ -6,10 +6,10 @@
 #include <cstdint>
 #include <fstream>
 #include <chrono>
-#include "demuxPacket.h"
-#include "NALReader.h"
-#include "adtsReader.h"
-#include "adtsHeader.h"
+#include "transportStream/demuxPacket.h"
+#include "nalu/NALReader.h"
+#include "adts/adtsReader.h"
+#include "adts/adtsHeader.h"
 
 #define TRANSPORT_STREAM_PACKETS_SIZE 188
 

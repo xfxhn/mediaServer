@@ -3,9 +3,9 @@
 #define RTSP_RTSPSENDDATA_H
 
 #include <cstdint>
-#include "TcpSocket.h"
+#include "bitStream/writeStream.h"
+#include "socket/TcpSocket.h"
 
-class WriteStream;
 
 class RtpPacket {
 public:

@@ -4,7 +4,7 @@
 #define MEDIASERVER_FLVAUDIOTAG_H
 
 #include <cstdint>
-#include "writeStream.h"
+#include "bitStream/writeStream.h"
 
 class FLVAudioTag {
 private:
@@ -60,7 +60,7 @@ public:
 
     int writeConfig(WriteStream &ws) const;
 
-    int writeData(WriteStream &ws, uint8_t *data, uint32_t size) const;
+    int writeData(WriteStream &ws) const;
 };
 
 

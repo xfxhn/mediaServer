@@ -3,6 +3,7 @@
 
 
 
+add_subdirectory(log)
 add_subdirectory(bitStream)
 add_subdirectory(nalu)
 add_subdirectory(adts)
@@ -18,9 +19,7 @@ add_subdirectory(flashVideo)
 
 add_executable(mediaServer main.cpp)
 target_include_directories(mediaServer
-        PRIVATE ${PROJECT_SOURCE_DIR}/src/server
-        #[[PRIVATE ${PROJECT_SOURCE_DIR}/src/protocol
-        PRIVATE ${PROJECT_SOURCE_DIR}/src/nalu]]
+        PRIVATE ${PROJECT_SOURCE_DIR}/src
         )
 
 target_link_libraries(mediaServer PRIVATE server)

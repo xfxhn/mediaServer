@@ -1,7 +1,7 @@
 ﻿
 
 #include "FLVHeader.h"
-#include "writeStream.h"
+#include "bitStream/writeStream.h"
 
 int FLVHeader::write(WriteStream &ws) {
 

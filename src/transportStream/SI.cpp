@@ -2,7 +2,7 @@
 
 #include "SI.h"
 
-#include "writeStream.h"
+#include "bitStream/writeStream.h"
 
 /*具体参考mpeg-1 part1 table 2-34*/
 #define AVC 0x1B

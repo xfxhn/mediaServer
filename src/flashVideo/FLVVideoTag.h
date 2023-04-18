@@ -5,7 +5,7 @@
 
 #include <cstdint>
 #include <vector>
-#include "writeStream.h"
+#include "bitStream/writeStream.h"
 
 enum FRAME_TYPE {
     AVC_sequence_header = 0,

@@ -3,7 +3,7 @@
 #include "AVPacket.h"
 #include <thread>
 #include <filesystem>
-#include "readStream.h"
+#include "bitStream/readStream.h"
 
 /*存储一个启动时间，然后在每个要发送的函数里获取当前时间，用当前的这个时间减去启动时间
  * 然后用这个时间和dts作比较，如果dts大于这个时间，就不发送
@@ -184,6 +184,7 @@ int AVPacket::readFrame(AVPackage *package) {
             if (picture->finishFlag) {
                 package->idrFlag = picture->sliceHeader.nalu.IdrPicFlag;
                 package->fps = picture->sliceHeader.sps.fps;
+                package->pts = picture->pts;
                 package->dts = picture->dts;
                 package->decodeFrameNumber = picture->decodeFrameNumber;
                 package->data1 = picture->data;
@@ -201,6 +202,7 @@ int AVPacket::readFrame(AVPackage *package) {
 
             if (header.finishFlag) {
                 package->idrFlag = true;
+                package->fps = header.sample_rate;
                 package->dts = header.dts;
                 package->pts = header.pts;
                 package->data2 = header.data;

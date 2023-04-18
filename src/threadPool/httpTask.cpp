@@ -1,5 +1,5 @@
 ﻿#include "httpTask.h"
-#include "http.h"
+#include "protocol/http.h"
 
 
 HttpTask::HttpTask(SOCKET socket) : clientSocket(socket) {
@@ -17,7 +17,7 @@ int HttpTask::run() {
     char buffer[TcpSocket::MAX_BUFFER]{0};
     int length = 0;
 
-    while (true) {
+    while (http.stopFlag) {
 
         ret = TcpSocket::receive(clientSocket, buffer, length);
         if (ret < 0) {

@@ -9,8 +9,8 @@
 #include <vector>
 #include "SI.h"
 #include "PES.h"
-#include "writeStream.h"
-#include "readStream.h"
+#include "bitStream/writeStream.h"
+#include "bitStream/readStream.h"
 
 
 class NALPicture;

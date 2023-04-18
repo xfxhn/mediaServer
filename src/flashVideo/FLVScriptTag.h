@@ -3,7 +3,7 @@
 #define MEDIASERVER_SCRIPTTAG_H
 
 #include <string>
-#include "writeStream.h"
+#include "bitStream/writeStream.h"
 
 
 enum marker {

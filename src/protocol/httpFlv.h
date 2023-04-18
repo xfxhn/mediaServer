@@ -6,11 +6,13 @@
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
-#include "TcpSocket.h"
-#include "AVPacket.h"
+#include "socket/TcpSocket.h"
+#include "AVPacket/AVPacket.h"
 
 class HttpFlv {
 private:
+
+    uint8_t response[2048];
 
 
     AVPackage *package{nullptr};
@@ -18,9 +20,6 @@ private:
     std::string dir;
     SOCKET clientSocket;
 
-
-    uint8_t *audioBuffer{nullptr};
-    uint8_t *videoBuffer{nullptr};
 
     uint32_t previousTagSize{0};
 public:

@@ -2,11 +2,11 @@
 #ifndef RTSP_RTSPRECEIVEDATA_H
 #define RTSP_RTSPRECEIVEDATA_H
 
-#include "transportPacket.h"
-#include "TcpSocket.h"
-#include "NALReader.h"
-#include "adtsReader.h"
-#include "adtsHeader.h"
+#include "transportStream/transportPacket.h"
+#include "socket/TcpSocket.h"
+#include "nalu/NALReader.h"
+#include "adts/adtsReader.h"
+#include "adts/adtsHeader.h"
 
 class RtspReceiveData {
 private:
@@ -49,7 +49,7 @@ private:
     TransportPacket ts;
     uint8_t *buffer{nullptr};
 
-
+    /*todo 这里可以使用AVpacket封装一层来写入数据，保持接口一致性*/
     NALReader videoReader;
     NALPicture *picture{nullptr};
     AdtsReader audioReader;

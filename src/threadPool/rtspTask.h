@@ -4,15 +4,15 @@
 
 
 #include "task.h"
-#include "rtsp.h"
-#include "TcpSocket.h"
+#include "protocol/rtsp.h"
+#include "socket/TcpSocket.h"
 
 
 class RtspTask : public Task {
 
 private:
     /* TcpSocket &rtsp;*/
-    SOCKET clientSocket;
+    SOCKET clientSocket{};
 
 
 public:
