@@ -31,7 +31,7 @@ public:
 
 private:
 
-    int sendFLV(std::filesystem::path &path);
+    int sendFLV(std::filesystem::path path);
 
     int responseData(int status, const std::string &msg) const;
 };

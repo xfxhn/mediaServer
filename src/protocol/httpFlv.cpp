@@ -9,6 +9,8 @@
 #include "flashVideo/FLVVideoTag.h"
 #include "flashVideo/FLVAudioTag.h"
 
+#include "log/logger.h"
+
 
 #define TAG_SIZE 4
 #define TAG_HEADER_SIZE 11
@@ -233,31 +235,39 @@ int HttpFlv::sendAudioSequenceHeader(AVPacket &packet) {
     return 0;
 }
 
+void HttpFlv::setStopFlag(bool flag) {
+    stopFlag = false;
+}
+
 int HttpFlv::sendData() {
     int ret;
     AVPacket packet;
     ret = packet.init(dir, transportStreamPacketNumber);
     if (ret < 0) {
-        fprintf(stderr, "packet.init 初始化失败\n");
+        log_error("packet.init 初始化失败");
         return ret;
     }
-
-    while (true) {
+    /*由外部http控制*/
+    while (stopFlag) {
         ret = packet.readFrame(package);
         if (ret < 0) {
-            fprintf(stderr, "packet.readFrame 失败\n");
+            if (ret == AVERROR_EOF) {
+                log_info("读取完毕");
+                break;
+            }
+            log_error("packet.readFrame 失败");
             return -1;
         }
         if (package->type == "video") {
             ret = sendVideoData();
             if (ret < 0) {
-                fprintf(stderr, "sendVideoData 失败\n");
+                log_error("sendVideoData 失败");
                 return ret;
             }
         } else if (package->type == "audio") {
             ret = sendAudioData();
             if (ret < 0) {
-                fprintf(stderr, "sendAudioData 失败\n");
+                log_error("sendAudioData 失败");
                 return ret;
             }
         }
@@ -285,13 +295,13 @@ int HttpFlv::sendAudioData() {
     /*先发送flv的壳子*/
     ret = TcpSocket::sendData(clientSocket, response, (int) ws.bufferSize);
     if (ret < 0) {
-        fprintf(stderr, "发送数据失败\n");
+        log_error("发送数据失败");
         return ret;
     }
     /*在发送具体数据*/
     ret = TcpSocket::sendData(clientSocket, package->data2, (int) package->size);
     if (ret < 0) {
-        fprintf(stderr, "发送数据失败\n");
+        log_error("发送数据失败");
         return ret;
     }
 
@@ -320,19 +330,19 @@ int HttpFlv::sendVideoData() {
     /*先发送flv的壳子*/
     ret = TcpSocket::sendData(clientSocket, response, (int) ws.bufferSize);
     if (ret < 0) {
-        fprintf(stderr, "发送数据失败\n");
+        log_error("发送数据失败");
         return ret;
     }
     for (auto &frame: package->data1) {
         const uint32_t length = bswap_32(frame.nalUintSize);
         ret = TcpSocket::sendData(clientSocket, (uint8_t *) &length, 4);
         if (ret < 0) {
-            fprintf(stderr, "发送数据失败\n");
+            log_error("发送数据失败");
             return ret;
         }
         ret = TcpSocket::sendData(clientSocket, frame.data, (int) frame.nalUintSize);
         if (ret < 0) {
-            fprintf(stderr, "发送数据失败\n");
+            log_error("发送数据失败");
             return ret;
         }
     }

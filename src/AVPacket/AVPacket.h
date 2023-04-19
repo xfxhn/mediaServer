@@ -13,6 +13,8 @@
 
 #define TRANSPORT_STREAM_PACKETS_SIZE 188
 
+#define AVERROR_EOF (-10)
+
 struct AVPackage {
     bool idrFlag{false};
     std::string type;

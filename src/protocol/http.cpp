@@ -51,8 +51,7 @@ int Http::parse(std::string &packet, const std::string &data) {
         }
     } else if (source.extension() == ".flv") {
         /*这里应该单独开个线程去发送数据*/
-        sendFlVThread = new std::thread(&Http::sendFLV, this, std::ref(source));
-
+        sendFlVThread = new std::thread(&Http::sendFLV, this, source);
     } else {
         fprintf(stderr, "不支持这种类型\n");
         ret = responseData(415, "Unsupported Media Type");
@@ -62,15 +61,17 @@ int Http::parse(std::string &packet, const std::string &data) {
     return 0;
 }
 
-int Http::sendFLV(std::filesystem::path &path) {
+int Http::sendFLV(std::filesystem::path path) {
     int ret;
     ret = flv.init(path, clientSocket);
     if (ret < 0) {
+        stopFlag = false;
         responseData(500, "错误");
         return -1;
     }
     ret = flv.disposeFlv();
     if (ret < 0) {
+        stopFlag = false;
         responseData(500, "错误");
         return -1;
     }
@@ -101,10 +102,13 @@ int Http::responseData(int status, const std::string &msg) const {
 
 Http::~Http() {
     log_info("http 析构");
-
+    stopFlag = false;
+    flv.setStopFlag(stopFlag);
     if (sendFlVThread && sendFlVThread->joinable()) {
         sendFlVThread->join();
     }
+
+    log_info("sendFlVThread 执行完成");
 }
 
 

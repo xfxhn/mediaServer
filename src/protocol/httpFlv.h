@@ -22,7 +22,11 @@ private:
 
 
     uint32_t previousTagSize{0};
+
+    bool stopFlag{true};
 public:
+    void setStopFlag(bool flag);
+
     int init(std::filesystem::path &path, SOCKET socket);
 
     int disposeFlv();

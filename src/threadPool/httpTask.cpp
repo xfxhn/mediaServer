@@ -1,5 +1,6 @@
 ﻿#include "httpTask.h"
 #include "protocol/http.h"
+#include "log/logger.h"
 
 
 HttpTask::HttpTask(SOCKET socket) : clientSocket(socket) {
@@ -21,7 +22,7 @@ int HttpTask::run() {
 
         ret = TcpSocket::receive(clientSocket, buffer, length);
         if (ret < 0) {
-            fprintf(stderr, "http.receive failed\n");
+            log_debug("http.receive 退出");
             return ret;
         }
 

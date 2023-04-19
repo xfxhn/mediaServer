@@ -2,6 +2,7 @@
 #include "TcpSocket.h"
 #include <cstring>
 #include <cstdio>
+#include "log/logger.h"
 
 
 int TcpSocket::createSocket() {
@@ -106,8 +107,12 @@ int TcpSocket::receive(SOCKET clientSocket, char *data, int &dataSize) {
 
     dataSize = recv(clientSocket, data, MAX_BUFFER, 0);
     /*这里返回0的话表示对端关闭了连接，发送了FIN包*/
-    if (dataSize <= 0) {
-        fprintf(stderr, "接收数据失败 错误值 = %d\n", dataSize);
+    if (dataSize == 0) {
+        log_trace("客户端关闭了连接\n");
+        return -1;
+    }
+    if (dataSize < 0) {
+        log_error("接收数据失败,ret = %d", dataSize);
         return -1;
     }
     return 0;

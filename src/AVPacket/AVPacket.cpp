@@ -4,6 +4,7 @@
 #include <thread>
 #include <filesystem>
 #include "bitStream/readStream.h"
+#include "log/logger.h"
 
 /*存储一个启动时间，然后在每个要发送的函数里获取当前时间，用当前的这个时间减去启动时间
  * 然后用这个时间和dts作比较，如果dts大于这个时间，就不发送
@@ -51,12 +52,14 @@ int AVPacket::getTransportStreamData(bool videoFlag, bool audioFlag) {
         if (size == 0) {
             name = "/test" + std::to_string(++currentPacket) + ".ts";
             if (!std::filesystem::exists(path + name)) {
-                /*没有这个文件，说明这个文件还没读完，要继续读这个文件*/
-                --currentPacket;
-                fs.clear();
-                fprintf(stderr, "没有下个文件,等待一会儿\n");
-                std::this_thread::sleep_for(std::chrono::milliseconds(100));
-                continue;
+//                /*没有这个文件，说明这个文件还没读完，要继续读这个文件*/
+//                --currentPacket;
+//                fs.clear();
+//                fprintf(stderr, "没有下个文件,等待一会儿\n");
+//                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+//                continue;
+                log_info("没有文件可以读了，退出");
+                return AVERROR_EOF;
             }
 
             /*表示这个文件读完了，读下一个*/
@@ -165,14 +168,19 @@ int AVPacket::readFrame(AVPackage *package) {
         /*有可能这个时候读ts tag包的是video，但是这个ts tag包凑不够一帧，下个ts tag包是audio*/
         ret = getTransportStreamData();
         if (ret < 0) {
-            fprintf(stderr, "getTransportStreamData 失败\n");
+            if (ret == AVERROR_EOF) {
+                return AVERROR_EOF;
+            }
+            log_error("getTransportStreamData 失败");
             return ret;
+
         }
 
         if (ret == 1) {
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
             continue;
         }
+
 
         if (ret == VIDEO_PID) {
             ret = videoReader.getVideoFrame3(picture);
