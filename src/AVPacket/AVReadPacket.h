@@ -8,6 +8,7 @@
 #include <chrono>
 #include "transportStream/demuxPacket.h"
 #include "nalu/NALReader.h"
+#include "nalu/NALPicture.h"
 #include "adts/adtsReader.h"
 #include "adts/adtsHeader.h"
 
@@ -27,7 +28,7 @@ struct AVPackage {
     uint8_t *data2{nullptr};
 };
 
-class AVPacket {
+class AVReadPacket {
 private:
     std::chrono::time_point<std::chrono::high_resolution_clock> start;
     std::chrono::duration<uint64_t, std::milli> elapsed;
@@ -51,11 +52,10 @@ public:
     uint8_t spsSize{0};
     uint8_t ppsSize{0};
     AdtsHeader aacHeader;
+
 public:
 
     int init(const std::string &dir, uint32_t transportStreamPacketNumber);
-
-    int getParameter();
 
     static AVPackage *allocPacket();
 
@@ -63,10 +63,12 @@ public:
 
     int readFrame(AVPackage *package);
 
-    ~AVPacket();
+    int getParameter();
+
+    ~AVReadPacket();
 
 private:
-    int getTransportStreamData(bool videoFlag = true, bool audioFlag = true);
+    int readTransportStream(bool videoFlag = true, bool audioFlag = true);
 };
 
 

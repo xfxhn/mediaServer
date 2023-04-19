@@ -108,7 +108,7 @@ int TcpSocket::receive(SOCKET clientSocket, char *data, int &dataSize) {
     dataSize = recv(clientSocket, data, MAX_BUFFER, 0);
     /*这里返回0的话表示对端关闭了连接，发送了FIN包*/
     if (dataSize == 0) {
-        log_trace("客户端关闭了连接\n");
+        log_trace("客户端关闭了连接");
         return -1;
     }
     if (dataSize < 0) {

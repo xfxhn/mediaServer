@@ -7,14 +7,19 @@
 #include <filesystem>
 #include <fstream>
 #include "socket/TcpSocket.h"
-#include "AVPacket/AVPacket.h"
+#include "AVPacket/AVReadPacket.h"
+
+#include "flashVideo/FLVTagHeader.h"
+#include "flashVideo/FLVAudioTag.h"
+#include "flashVideo/FLVVideoTag.h"
 
 class HttpFlv {
 private:
+    FLVTagHeader tagHeader;
+    FLVAudioTag audioTag;
+    FLVVideoTag videoTag;
 
     uint8_t response[2048];
-
-
     AVPackage *package{nullptr};
     int transportStreamPacketNumber{0};
     std::string dir;
@@ -40,9 +45,9 @@ private:
 
     int sendSequenceHeader();
 
-    int sendVideoSequenceHeader(AVPacket &packet);
+    int sendVideoSequenceHeader(AVReadPacket &packet);
 
-    int sendAudioSequenceHeader(AVPacket &packet);
+    int sendAudioSequenceHeader(AVReadPacket &packet);
 
     int sendData();
 

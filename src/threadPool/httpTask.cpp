@@ -22,7 +22,6 @@ int HttpTask::run() {
 
         ret = TcpSocket::receive(clientSocket, buffer, length);
         if (ret < 0) {
-            log_debug("http.receive 退出");
             return ret;
         }
 

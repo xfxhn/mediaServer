@@ -1,6 +1,8 @@
 ﻿
 
 #include "rtspTask.h"
+#include "protocol/rtsp.h"
+#include "log/logger.h"
 
 int RtspTask::run() {
     int ret;
@@ -19,7 +21,7 @@ int RtspTask::run() {
         /*length本次获取的数据大小*/
         ret = TcpSocket::receive(clientSocket, buffer, length);
         if (ret < 0) {
-            fprintf(stderr, "rtsp.receive failed\n");
+            log_info("rtsp receive exit");
             return ret;
         }
 
@@ -37,7 +39,7 @@ int RtspTask::run() {
             /*处理请求，接收客户端发过来的数据*/
             ret = rtsp.parseRtsp(packet, data);
             if (ret < 0) {
-                fprintf(stderr, "rtsp.parseRtsp失败\n");
+                log_error("rtsp.parseRtsp失败");
                 return ret;
             }
 

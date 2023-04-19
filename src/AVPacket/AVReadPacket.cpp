@@ -1,8 +1,9 @@
 ﻿
 
-#include "AVPacket.h"
+#include "AVReadPacket.h"
 #include <thread>
 #include <filesystem>
+
 #include "bitStream/readStream.h"
 #include "log/logger.h"
 
@@ -10,16 +11,16 @@
  * 然后用这个时间和dts作比较，如果dts大于这个时间，就不发送
  * */
 
-int AVPacket::init(const std::string &dir, uint32_t transportStreamPacketNumber) {
+int AVReadPacket::init(const std::string &dir, uint32_t transportStreamPacketNumber) {
     path = dir;
     currentPacket = transportStreamPacketNumber;
 
-
     std::string name = "/test" + std::to_string(currentPacket) + ".ts";
-    printf("读取%s文件\n", name.c_str());
+    log_info("读取%s文件", name.c_str());
+
     fs.open(path + name, std::ios::out | std::ios::binary);
     if (!fs.is_open()) {
-        fprintf(stderr, "111  open %s failed\n", (path + name).c_str());
+        log_error("open %s failed", (path + name).c_str());
         return -1;
     }
 
@@ -33,7 +34,8 @@ int AVPacket::init(const std::string &dir, uint32_t transportStreamPacketNumber)
     return 0;
 }
 
-int AVPacket::getTransportStreamData(bool videoFlag, bool audioFlag) {
+
+int AVReadPacket::readTransportStream(bool videoFlag, bool audioFlag) {
 
     int ret = 0;
 
@@ -106,7 +108,8 @@ int AVPacket::getTransportStreamData(bool videoFlag, bool audioFlag) {
     return ret;
 }
 
-int AVPacket::getParameter() {
+
+int AVReadPacket::getParameter() {
     int ret;
 
     bool videoFlag = true;
@@ -115,7 +118,7 @@ int AVPacket::getParameter() {
         videoReader.resetBuffer();
         audioReader.resetBuffer();
 
-        ret = getTransportStreamData(videoFlag, audioFlag);
+        ret = readTransportStream(videoFlag, audioFlag);
         if (ret < 0) {
             fprintf(stderr, "getTransportStreamData 失败\n");
             return ret;
@@ -155,7 +158,7 @@ int AVPacket::getParameter() {
 }
 
 
-int AVPacket::readFrame(AVPackage *package) {
+int AVReadPacket::readFrame(AVPackage *package) {
     int ret;
     header.finishFlag = false;
     picture->finishFlag = false;
@@ -166,14 +169,13 @@ int AVPacket::readFrame(AVPackage *package) {
 
     while (true) {
         /*有可能这个时候读ts tag包的是video，但是这个ts tag包凑不够一帧，下个ts tag包是audio*/
-        ret = getTransportStreamData();
+        ret = readTransportStream();
         if (ret < 0) {
             if (ret == AVERROR_EOF) {
                 return AVERROR_EOF;
             }
             log_error("getTransportStreamData 失败");
             return ret;
-
         }
 
         if (ret == 1) {
@@ -188,7 +190,10 @@ int AVPacket::readFrame(AVPackage *package) {
                 fprintf(stderr, "videoReader.getVideoFrame3 失败\n");
                 return -1;
             }
-
+            /*
+             * 每次进来获取一帧数据的时候把finishFlag设置为false，然后循环去读取数据，
+             * 只有读够了完整的一帧，finishFlag才会被设置为true
+             * */
             if (picture->finishFlag) {
                 package->idrFlag = picture->sliceHeader.nalu.IdrPicFlag;
                 package->fps = picture->sliceHeader.sps.fps;
@@ -224,16 +229,18 @@ int AVPacket::readFrame(AVPackage *package) {
     return 0;
 }
 
-AVPackage *AVPacket::allocPacket() {
+AVPackage *AVReadPacket::allocPacket() {
     return new AVPackage;
 }
 
-void AVPacket::freePacket(AVPackage *package) {
+void AVReadPacket::freePacket(AVPackage *package) {
     delete package;
 }
 
-AVPacket::~AVPacket() {
+AVReadPacket::~AVReadPacket() {
     fs.close();
 }
+
+
 
 

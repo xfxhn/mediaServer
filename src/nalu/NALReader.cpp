@@ -1,5 +1,6 @@
 ﻿#include "NALReader.h"
 #include "bitStream/readStream.h"
+#include "log/logger.h"
 
 
 int NALReader::init() {
@@ -119,20 +120,6 @@ void NALReader::resetBuffer() {
 }
 
 
-int NALReader::getVideoFrame2(NALPicture *&picture, uint8_t *data, uint32_t size, uint8_t startCodeLength) {
-    if (picture->pictureFinishFlag) {
-        picture = unoccupiedPicture;
-    }
-
-
-    int ret = disposePicture(picture, data, size, startCodeLength);
-    if (ret < 0) {
-        fprintf(stderr, "计算picture错误\n");
-        return ret;
-    }
-    return 0;
-}
-
 int NALReader::getVideoFrame3(NALPicture *&picture) {
     int ret;
 
@@ -141,17 +128,22 @@ int NALReader::getVideoFrame3(NALPicture *&picture) {
     int startCodeLen1 = 0;
     int startCodeLen2 = 0;
 
-
+    /*找到了nalu，判断是否是完整的一帧*/
+//    if (picture->pictureFinishFlag) {
+//        picture = unoccupiedPicture;
+//    }
     ret = findNALU(pos1, pos2, startCodeLen1, startCodeLen2);
     if (ret == 2) {
+
+
         uint8_t *data = pos1 + startCodeLen1;
-        //      uint8_t *data = pos1;
         uint32_t size = pos2 - data;
 
         ret = getVideoFrame2(picture, data, size, 0);
         if (ret < 0) {
             return ret;
         }
+
         /*找到一个nalu，才可以去重置这个内存*/
         resetFlag = true;
         bufferPosition = pos2;
@@ -160,6 +152,22 @@ int NALReader::getVideoFrame3(NALPicture *&picture) {
         }
     }
     return ret;
+}
+
+int NALReader::getVideoFrame2(NALPicture *&picture, uint8_t *data, uint32_t size, uint8_t startCodeLength) {
+
+    /*能够进入到这个函数，肯定是一个完整的nalu了 */
+    if (picture->pictureFinishFlag) {
+        /*进入到这里才是完整的一帧*/
+        picture = unoccupiedPicture;
+    }
+
+    int ret = disposePicture(picture, data, size, startCodeLength);
+    if (ret < 0) {
+        log_error("disposePicture 错误");
+        return ret;
+    }
+    return 0;
 }
 
 int NALReader::disposePicture(NALPicture *picture, uint8_t *data, uint32_t size, uint8_t startCodeLength) {
@@ -214,13 +222,13 @@ int NALReader::disposePicture(NALPicture *picture, uint8_t *data, uint32_t size,
 
         picture->sliceHeader.slice_header(rs, nalUnitHeader, spsList, ppsList);
         if (picture->sliceHeader.first_mb_in_slice != 0) {
-            fprintf(stderr, "不支持一帧分成多个slice\n");
+            log_error("不支持一帧分成多个slice");
             return -1;
         }
         /*解码POC,查看h264文档 8 Decoding process (only needed to be invoked for one slice of a picture)只需要为一帧的切片调用即可*/
         ret = picture->decoding_process_for_picture_order_count();
         if (ret < 0) {
-            fprintf(stderr, "解析picture order count 失败\n");
+            log_error("解析picture order count 失败");
             return ret;
         }
         /*参考帧重排序在每个P、SP或B片的解码过程开始时调用。*/
@@ -237,7 +245,7 @@ int NALReader::disposePicture(NALPicture *picture, uint8_t *data, uint32_t size,
         /*这里标记了这个使用的帧是长期参考还是短期参考，并且给出一个空闲的帧*/
         ret = gop.decoding_finish(picture, unoccupiedPicture);
         if (ret < 0) {
-            fprintf(stderr, "图像解析失败\n");
+            log_error("图像解析失败");
             return ret;
         }
         /*计算pts和dts*/
@@ -257,7 +265,7 @@ int NALReader::disposePicture(NALPicture *picture, uint8_t *data, uint32_t size,
         picture->pictureFinishFlag = true;
         picture->finishFlag = true;
     } else {
-        fprintf(stderr, "其他type\n");
+        log_warn("其他type");
         picture->pictureFinishFlag = false;
         picture->finishFlag = false;
     }
@@ -294,10 +302,7 @@ NALPicture *NALReader::allocPicture() {
 
 
 NALReader::~NALReader() {
-    if (bufferStart) {
-        delete[] bufferStart;
-        bufferStart = nullptr;
-    }
+    delete[] bufferStart;
 }
 
 

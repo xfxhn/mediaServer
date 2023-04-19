@@ -54,12 +54,10 @@ int Server::startRtspServer() {
     while (true) {
         SOCKET clientSocket = rtsp.acceptClient();
         if (clientSocket < 0) {
-            fprintf(stderr, "accept 失败\n");
+            log_error("rtsp accept 失败");
             return -1;
         }
-
-
-        printf("rtsp client ip:%s,client port:%d\n", rtsp.clientIp, rtsp.clientPort);
+        log_info("rtsp 连接  ip=%s, port=%d", rtsp.clientIp, rtsp.clientPort);
         RtspTask *task = new RtspTask(clientSocket); // NOLINT(modernize-use-auto)
         pool.addTask(task);
 
@@ -71,10 +69,10 @@ int Server::startHttpServer() {
     while (true) {
         SOCKET clientSocket = http.acceptClient();
         if (clientSocket < 0) {
-            fprintf(stderr, "accept 失败\n");
+            log_error("http accept 失败");
             return -1;
         }
-        printf("http client ip:%s,client port:%d\n", rtsp.clientIp, rtsp.clientPort);
+        log_info("http 连接  ip=%s, port=%d", http.clientIp, http.clientPort);
         HttpTask *task = new HttpTask(clientSocket); // NOLINT(modernize-use-auto)
         pool.addTask(task);
 

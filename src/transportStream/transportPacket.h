@@ -6,37 +6,18 @@
 
 #include <cstdint>
 #include <fstream>
-#include <vector>
 #include "SI.h"
 #include "PES.h"
+#include "nalu/NALPicture.h"
+#include "adts/adtsHeader.h"
 #include "bitStream/writeStream.h"
-#include "bitStream/readStream.h"
 
-
-class NALPicture;
-
-class AdtsHeader;
-
-struct TransportStreamInfo {
-    std::string name;
-    double duration;
-};
 
 class TransportPacket {
 
 private:
-
-    int transportStreamPacketNumber{0};
-    std::string dir;
-    uint32_t seq{0};
-    double lastDuration{0};
-
     uint8_t *buffer{nullptr};
     WriteStream *ws{nullptr};
-
-    std::ofstream m3u8FileSystem;
-    std::ofstream transportStreamFileSystem;
-    std::vector<TransportStreamInfo> list;
 
 
     PES pes;
@@ -93,18 +74,21 @@ private:
 
     uint64_t time{0};
 public:
-    int init(std::string path);
+    int init();
 
-    int writeTransportStream(const NALPicture *picture/*, int &transportStreamPacketNumber*/);
+    void resetPacketSize();
 
-    int writeVideoFrame(const NALPicture *picture);
+    int writeTable(std::ofstream &fs);
 
-    int writeAudioFrame(const AdtsHeader &header);
+
+    int writeVideoFrame(const NALPicture *picture, std::ofstream &fs);
+
+    int writeAudioFrame(const AdtsHeader &header, std::ofstream &fs);
 
     ~TransportPacket();
 
 private:
-    int writeTable();
+
 
     int writeServiceDescriptionTable();
 

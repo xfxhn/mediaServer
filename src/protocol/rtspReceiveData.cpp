@@ -1,6 +1,6 @@
 ﻿
 #include "rtspReceiveData.h"
-
+#include "log/logger.h"
 
 enum {
     /*多个nalu在一个rtp包*/
@@ -21,17 +21,11 @@ static constexpr uint8_t startCode[4] = {0, 0, 0, 1};
 
 int RtspReceiveData::init(SOCKET socket, const std::string &path, uint8_t video, uint8_t audio) {
     int ret;
-    ret = ts.init(path);
+    /*要写入的目录，和从第几个写入*/
+    ret = packet.init(path, 0);
     if (ret < 0) {
-        fprintf(stderr, "init ts失败\n");
+        log_error("packet.init 失败");
         return ret;
-    }
-
-    videoReader.init();
-    picture = videoReader.allocPicture();
-    if (picture == nullptr) {
-        fprintf(stderr, "获取frame失败\n");
-        return -1;
     }
 
 
@@ -41,12 +35,10 @@ int RtspReceiveData::init(SOCKET socket, const std::string &path, uint8_t video,
     /*一个rtp包最大大小不会超过16个bit也就是65535*/
     buffer = new uint8_t[65535];
 
+
     return 0;
 }
 
-RtspReceiveData::~RtspReceiveData() {
-    delete[] buffer;
-}
 
 int RtspReceiveData::receiveData(const std::string &msg) {
     int ret;
@@ -67,7 +59,7 @@ int RtspReceiveData::receiveData(const std::string &msg) {
         if (bufferSize < 4) {
             ret = TcpSocket::receive(clientSocket, (char *) buffer + bufferSize, size);
             if (ret < 0) {
-                fprintf(stderr, "TcpSocket::receive 失败\n");
+                log_warn("TcpSocket::receive");
                 return ret;
             }
             bufferSize += size;
@@ -76,7 +68,7 @@ int RtspReceiveData::receiveData(const std::string &msg) {
         }
         uint8_t magic = buffer[0];
         if (magic != '$') {
-            fprintf(stderr, "读取错误，没找到分隔符\n");
+            log_warn("推流断开连接，没找到分割");
             return -1;
         }
         uint8_t channel = buffer[1];
@@ -90,7 +82,7 @@ int RtspReceiveData::receiveData(const std::string &msg) {
                 /*不够rtp包大小继续取数据，直到取到为止*/
                 ret = TcpSocket::receive(clientSocket, (char *) (rtpBuffer + rtpBufferSize), size);
                 if (ret < 0) {
-                    fprintf(stderr, "TcpSocket::receive 失败\n");
+                    log_warn("TcpSocket::receive");
                     return ret;
                 }
                 rtpBufferSize += size;
@@ -98,7 +90,7 @@ int RtspReceiveData::receiveData(const std::string &msg) {
                 /*处理数据*/
                 ret = disposeRtpData(rtpBuffer, rtpBufferSize, channel, length);
                 if (ret < 0) {
-                    fprintf(stderr, "处理rtp包失败\n");
+                    log_error("处理rtp包失败");
                     return ret;
                 }
                 rtpBufferSize -= length;
@@ -116,7 +108,6 @@ int RtspReceiveData::receiveData(const std::string &msg) {
 int RtspReceiveData::disposeRtpData(uint8_t *rtpBuffer, uint32_t rtpBufferSize, uint8_t channel, uint16_t length) {
     int ret;
     if (channel == videoChannel) {
-
         ReadStream rs(rtpBuffer, rtpBufferSize);
         /*获取rtp header*/
         ret = getRtpHeader(rs);
@@ -124,6 +115,7 @@ int RtspReceiveData::disposeRtpData(uint8_t *rtpBuffer, uint32_t rtpBufferSize, 
             return ret;
         }
         length -= 12;
+
 
         uint8_t forbidden_zero_bit = rs.readMultiBit(1);
         uint8_t nal_ref_idc = rs.readMultiBit(2);
@@ -153,33 +145,32 @@ int RtspReceiveData::disposeRtpData(uint8_t *rtpBuffer, uint32_t rtpBufferSize, 
 
 
             if (start == 1 && end == 0) {
-                *(rs.currentPtr - 1) = forbidden_zero_bit << 7 | (nal_ref_idc << 5) | nal_unit_type;
+
                 /*这里手动给nalu加上起始码，固定0001*/
 
-
-                memcpy(videoReader.bufferStart, startCode, 4);
-                memcpy(videoReader.bufferStart + 4, rs.currentPtr - 1, length + 1);
-                videoReader.blockBufferSize = 4 + length + 1;
-            } else if (start == 0 && end == 0) {
-                memcpy(videoReader.bufferStart + videoReader.blockBufferSize, rs.currentPtr, length);
-                videoReader.blockBufferSize += length;
-            } else if (start == 0 && end == 1) {
-                memcpy(videoReader.bufferStart + videoReader.blockBufferSize, rs.currentPtr, length);
-                videoReader.blockBufferSize += length;
-                /*这里还可以依靠mark标记来确定一帧的最后一个slice*/
-                ret = videoReader.getVideoFrame2(picture, videoReader.bufferStart, videoReader.blockBufferSize, 4);
+                uint8_t *ptr = rs.currentPtr - 5;
+                memcpy(ptr, startCode, 4);
+                *(ptr + 4) = forbidden_zero_bit << 7 | (nal_ref_idc << 5) | nal_unit_type;
+                ret = packet.writeFrame(ptr, length + 5, "video", false);
                 if (ret < 0) {
-                    fprintf(stderr, "nalReader.getPicture 失败\n");
-                    return -1;
+                    log_error("packet.writeFrame失败");
+                    return ret;
                 }
-                if (picture->pictureFinishFlag) {
-                    /*获取到完整的一帧,做对应操作*/
-                    ret = ts.writeTransportStream(picture);
-                    if (ret < 0) {
-                        fprintf(stderr, "ts.writeVideo 失败\n");
-                        return -1;
-                    }
+
+            } else if (start == 0 && end == 0) {
+
+                ret = packet.writeFrame(rs.currentPtr, length, "video", false);
+                if (ret < 0) {
+                    log_error("packet.writeFrame失败");
+                    return ret;
                 }
+            } else if (start == 0 && end == 1) {
+                ret = packet.writeFrame(rs.currentPtr, length, "video", true);
+                if (ret < 0) {
+                    log_error("packet.writeFrame失败");
+                    return ret;
+                }
+
             } else {
                 fprintf(stderr, "start = %d 和 end = %d 有问题\n", start, end);
                 return -1;
@@ -188,22 +179,14 @@ int RtspReceiveData::disposeRtpData(uint8_t *rtpBuffer, uint32_t rtpBufferSize, 
             printf("FU_B\n");
             return -1;
         } else {
-
             uint8_t *ptr = rs.currentPtr - 5;
             memcpy(ptr, startCode, 4);
             *(ptr + 4) = forbidden_zero_bit << 7 | (nal_ref_idc << 5) | nal_unit_type;
-            ret = videoReader.getVideoFrame2(picture, ptr, length + 5, 4);
-            if (ret < 0) {
-                fprintf(stderr, "nalReader.getPicture 失败\n");
-                return -1;
-            }
 
-            if (picture->pictureFinishFlag) {
-                ret = ts.writeTransportStream(picture);
-                if (ret < 0) {
-                    fprintf(stderr, "ts.writeVideo 失败\n");
-                    return -1;
-                }
+            ret = packet.writeFrame(ptr, length + 5, "video", true);
+            if (ret < 0) {
+                log_error("packet.writeFrame失败");
+                return ret;
             }
 
         }
@@ -224,18 +207,13 @@ int RtspReceiveData::disposeRtpData(uint8_t *rtpBuffer, uint32_t rtpBufferSize, 
             uint8_t indexDelta = rs.readMultiBit(3);
             sizeList.push_back(sizeLength);
         }
-        for (uint16_t aacSize: sizeList) {
-            AdtsHeader::setFrameLength(aacSize + 7);
-            memcpy(rs.currentPtr - 7, AdtsHeader::header, 7);
-
-            audioReader.disposeAudio(adtsHeader, rs.currentPtr - 7, aacSize + 7);
-
-            ret = ts.writeAudioFrame(adtsHeader);
+        for (uint16_t size: sizeList) {
+            ret = packet.writeFrame(rs.currentPtr - 7, size + 7, "audio", true);
             if (ret < 0) {
-                fprintf(stderr, "写入音频失败\n");
-                return -1;
+                log_error("packet.writeFrame失败");
+                return ret;
             }
-            rs.setBytePtr(aacSize);
+            rs.setBytePtr(size);
         }
 
     } else {
@@ -263,15 +241,17 @@ int RtspReceiveData::getRtpHeader(ReadStream &rs) {
 }
 
 int RtspReceiveData::writeVideoData(uint8_t *data, uint8_t size) {
-    return videoReader.getVideoFrame2(picture, data, size, 4);
+    return packet.setVideoParameter(data, size);
+
 }
 
 int
 RtspReceiveData::writeAudioData(uint8_t audioObjectType, uint8_t samplingFrequencyIndex, uint8_t channelConfiguration) {
-    WriteStream ws(AdtsHeader::header, 7);
-    adtsHeader.setConfig(audioObjectType - 1, samplingFrequencyIndex, channelConfiguration, 0);
-    adtsHeader.writeAdtsHeader(ws);
-    return 0;
+
+
+    return packet.setAudioParameter(audioObjectType, samplingFrequencyIndex, channelConfiguration);
 }
 
-
+RtspReceiveData::~RtspReceiveData() {
+    delete[] buffer;
+}

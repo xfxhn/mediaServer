@@ -3,9 +3,11 @@
 #include <filesystem>
 #include "utils/util.h"
 #include "utils/parseUrl.h"
-#include "AVPacket/AVPacket.h"
+#include "AVPacket/AVReadPacket.h"
 #include "rtspSendData.h"
 #include "rtspReceiveData.h"
+
+#include "log/logger.h"
 
 
 char Rtsp::response[2048]{0};
@@ -151,7 +153,7 @@ indexdeltalength=3：表示音频的访问单元索引差值（AU-Index-delta）
         }
 
 
-        AVPacket packet;
+        AVReadPacket packet;
         ret = packet.init(dir, transportStreamPacketNumber);
         if (ret < 0) {
             fprintf(stderr, "packet.init 初始化失败\n");
@@ -394,7 +396,7 @@ indexdeltalength=3：表示音频的访问单元索引差值（AU-Index-delta）
         ret = TcpSocket::sendData(clientSocket, reinterpret_cast<uint8_t *>(response),
                                   static_cast<int>(strlen(response)));
         if (ret < 0) {
-            fprintf(stderr, "发送数据失败 -> option\n");
+            fprintf(stderr, "发送数据失败\n");
             return ret;
         }
 
@@ -488,14 +490,14 @@ int Rtsp::sendData() {
     rtpPacket.init();
 
 
-    AVPacket packet;
+    AVReadPacket packet;
     ret = packet.init(dir, transportStreamPacketNumber);
     if (ret < 0) {
         fprintf(stderr, "packet.init 初始化失败\n");
         return ret;
     }
 
-    AVPackage *package = AVPacket::allocPacket();
+    AVPackage *package = AVReadPacket::allocPacket();
     while (stopSendFlag) {
         ret = packet.readFrame(package);
         if (ret < 0) {
@@ -540,19 +542,19 @@ int Rtsp::receiveData(std::string &msg) {
     RtspReceiveData receive;
     ret = receive.init(clientSocket, dir, videoChannel, audioChannel);
     if (ret < 0) {
-        fprintf(stderr, "receive.init失败\n");
+        log_error("receive.init失败");
         return ret;
     }
 
     /*写入sps和pps*/
     ret = receive.writeVideoData(info.spsData, info.spsSize);
     if (ret < 0) {
-        fprintf(stderr, "receive.writeData失败\n");
+        log_error("写入sps失败");
         return ret;
     }
     ret = receive.writeVideoData(info.ppsData, info.ppsSize);
     if (ret < 0) {
-        fprintf(stderr, "receive.writeData失败\n");
+        log_error("写入pps失败");
         return ret;
     }
 
@@ -560,12 +562,12 @@ int Rtsp::receiveData(std::string &msg) {
     ret = receive.writeAudioData(info.audioObjectType, info.samplingFrequencyIndex,
                                  info.channelConfiguration);
     if (ret < 0) {
-        fprintf(stderr, "receive.writeAudioData失败\n");
+        log_error("写入音频信息失败");
         return ret;
     }
     ret = receive.receiveData(msg);
     if (ret < 0) {
-        fprintf(stderr, "receive.receiveData失败\n");
+        log_error("接收推流数据失败");
         return ret;
     }
 
@@ -573,114 +575,6 @@ int Rtsp::receiveData(std::string &msg) {
     return 0;
 }
 
-
-/*发送音频和视频的函数*/
-//int Rtsp::sendVideo(uint32_t number) {
-//    int ret;
-//
-//    NALReader reader;
-//    ret = reader.init1(dir, number, 90000);
-//    if (ret < 0) {
-//        fprintf(stderr, "reader.init1失败\n");
-//        return ret;
-//    }
-//
-//
-//    RtpPacket videoPacket;
-//    videoPacket.init();
-//
-//    NALPicture *picture = reader.allocPicture();
-//    if (picture == nullptr) {
-//        fprintf(stderr, "分配picture失败\n");
-//        return -1;
-//    }
-//    uint32_t idx = 0;
-//    std::chrono::duration<int, std::milli> elapsed{};
-//    std::chrono::time_point<std::chrono::high_resolution_clock> start;
-//    while (stopVideoSendFlag) {
-//        start = std::chrono::high_resolution_clock::now();
-//
-//        while (idx++ < 8 && stopVideoSendFlag) {
-//            ret = reader.getVideoFrame1(picture);
-//            if (ret < 0) {
-//                fprintf(stderr, "获取视频数据失败\n");
-//                stopFlag = false;
-//                return ret;
-//            }
-//            videoPacket.timestamp = picture->dts;
-//            for (int i = 0; i < picture->data.size(); ++i) {
-//                const Frame &nalUint = picture->data[i];
-//                ret = videoPacket.sendVideoFrame(clientSocket, nalUint.data, nalUint.nalUintSize,
-//                                                 i == (picture->data.size() - 1), videoChannel);
-//                if (ret < 0) {
-//                    fprintf(stderr, "发送视频数据失败\n");
-//                    stopFlag = false;
-//                    return ret;
-//                }
-//            }
-//        }
-//        idx = 0;
-//        elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
-//                std::chrono::high_resolution_clock::now() - start);
-//        // picture->sliceHeader.sps.fps;
-//        //fprintf(stderr, "运行了多久 %d\n", elapsed.count());
-//        std::this_thread::sleep_for(std::chrono::milliseconds(picture->interval * 8 - elapsed.count()));
-//    }
-//
-//    /* todo  这里父线程终止，当前线程也应该退出，释放资源，等会儿做 */
-//
-//    return 0;
-//}
-//
-//int Rtsp::sendAudio(uint32_t number) {
-//    int ret;
-//
-//    AdtsReader reader;
-//    ret = reader.init1(dir, number);
-//    if (ret < 0) {
-//        fprintf(stderr, "reader.init1失败\n");
-//        return ret;
-//    }
-//
-//    RtpPacket audioPacket;
-//    audioPacket.init();
-//
-//
-//    AdtsHeader header;
-//
-//    uint32_t idx = 0;
-//
-//    std::chrono::duration<int, std::milli> elapsed{};
-//    std::chrono::time_point<std::chrono::high_resolution_clock> start;
-//    while (stopAudioSendFlag) {
-//        start = std::chrono::high_resolution_clock::now();
-//
-//        while (idx++ < 10 && stopAudioSendFlag) {
-//            /*这里是获取一帧音频数据*/
-//            ret = reader.getAudioFrame1(header);
-//            if (ret < 0) {
-//                fprintf(stderr, "获取audio frame失败\n");
-//                return ret;
-//            }
-//            audioPacket.timestamp = header.dts;
-//            /*这里是把音频数据发出去*/
-//            ret = audioPacket.sendAudioPacket(clientSocket, header.data, header.size, audioChannel);
-//            if (ret < 0) {
-//                fprintf(stderr, "发送音频包失败\n");
-//                //  audioSendError = true;
-//                return ret;
-//            }
-//        }
-//        idx = 0;
-//
-//
-//        elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
-//                std::chrono::high_resolution_clock::now() - start);
-//        std::this_thread::sleep_for(std::chrono::milliseconds((header.interval * 10) - elapsed.count() - 2));
-//    }
-//
-//    return 0;
-//}
 
 static constexpr uint8_t startCode[4] = {0, 0, 0, 1};
 
@@ -877,17 +771,13 @@ int Rtsp::parseAACConfig(const std::string &config, SdpInfo &sdpInfo) {
 
 
 
-    /*写入adts header*/
-//    WriteStream ws(AdtsHeader::header, 7);
-//    adtsHeader.setConfig(audioObjectType - 1, samplingFrequencyIndex, channelConfiguration, 0);
-//    adtsHeader.writeAdtsHeader(ws);
 
     return 0;
 }
 
 
 Rtsp::~Rtsp() {
-    printf("~Rtsp 析构\n");
+
     if (flag) {
         std::filesystem::remove_all(dir);
     }
@@ -897,7 +787,7 @@ Rtsp::~Rtsp() {
         SendThread->join();
         delete SendThread;
     }
-
+    log_info("Rtsp 析构");
 }
 
 

@@ -2,7 +2,7 @@
 
 
 
-add_library(AVPacket AVPacket.cpp)
+add_library(AVPacket AVReadPacket.cpp AVWritePacket.cpp)
 
 
 target_include_directories(AVPacket
