@@ -9,11 +9,5 @@ target_include_directories(protocol
         )
 #[[todo 更改每个lib的依赖]]
 target_link_libraries(protocol
-        PRIVATE nalu
-        PRIVATE adts
-        PRIVATE utils
-        PRIVATE bitStream
-        PUBLIC transportStream
-        PUBLIC flashVideo
-        PRIVATE AVPacket
+        PRIVATE bitStream log utils socket flashVideo AVPacket
         )

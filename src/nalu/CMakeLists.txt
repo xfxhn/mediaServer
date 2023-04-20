@@ -9,3 +9,4 @@ add_library(
 target_include_directories(nalu
         PRIVATE ${PROJECT_SOURCE_DIR}/src
         )
+target_link_libraries(nalu PRIVATE bitStream log)

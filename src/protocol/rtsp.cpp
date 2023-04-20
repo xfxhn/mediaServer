@@ -403,7 +403,6 @@ indexdeltalength=3：表示音频的访问单元索引差值（AU-Index-delta）
         /*这里接收客户端传过来的音视频数据，组帧*/
         ret = receiveData(msg);
         if (ret < 0) {
-            fprintf(stderr, "receiveData 失败\n");
             responseData(500, "接收音视频数据失败");
             return ret;
         }
@@ -535,8 +534,6 @@ int Rtsp::sendData() {
 }
 
 int Rtsp::receiveData(std::string &msg) {
-
-
     int ret;
 
     RtspReceiveData receive;

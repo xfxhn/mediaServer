@@ -3,8 +3,8 @@
 #include <cstdio>
 #include <cstring>
 #include <thread>
-#include "util.h"
-#include "readStream.h"
+#include "utils/util.h"
+#include "bitStream/readStream.h"
 
 
 

@@ -7,6 +7,5 @@ target_include_directories(threadPool
         PRIVATE ${PROJECT_SOURCE_DIR}/src
         )
 target_link_libraries(threadPool
-        PRIVATE socket
-        PUBLIC protocol
+        PRIVATE socket log protocol
         )

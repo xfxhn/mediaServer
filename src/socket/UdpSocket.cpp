@@ -1,6 +1,5 @@
 ﻿
 #include "UdpSocket.h"
-#include <cstdio>
 #include "log/logger.h"
 
 int UdpSocket::createSocket() {

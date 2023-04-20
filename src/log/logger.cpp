@@ -35,17 +35,17 @@ void Logger::log(Level level, const char *file, int line, const char *format, ..
 
     buf[strftime(buf, sizeof(buf), "%H:%M:%S", time)] = '\0';
 
-            va_start(ap, format);//初始化ap指向参数arg的下一个参数
+    va_start(ap, format);//初始化ap指向参数arg的下一个参数
 #ifdef LOG_USE_COLOR
     fprintf(stderr, "%s %s%-5s\x1b[0m \x1b[90m%s:%d:\x1b[0m ",
-    buf, level_colors[levels], level_strings[levels], file, line);
+            buf, level_colors[level], level_strings[level], file, line);
 #else
-    fprintf(stderr, "%s %-5s %s:%d: ", buf, level_strings[levels], file, line);
+    fprintf(stderr, "%s %-5s %s:%d: ", buf, level_strings[level], file, line);
 #endif
     vfprintf(stderr, format, ap);
     fprintf(stderr, "\n");
     fflush(stderr);
-            va_end(ap);
+    va_end(ap);
     mux.unlock();
 }
 

@@ -1,8 +1,6 @@
 ﻿
 
 #include "FLVAudioTag.h"
-#include <string>
-#include <cstring>
 
 void FLVAudioTag::setConfig(uint8_t packetType) {
     AACPacketType = packetType;

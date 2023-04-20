@@ -14,7 +14,7 @@ int NALReader::init() {
 int NALReader::findNALU(uint8_t *&pos1, uint8_t *&pos2, int &startCodeLen1, int &startCodeLen2) const {
 
     if (!bufferStart) {
-        fprintf(stderr, "请初始化\n");
+        log_error("请初始化");
         return -1;
     }
 

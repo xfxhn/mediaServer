@@ -1,9 +1,44 @@
 ﻿# 一个从零开始没有使用任何第三方库的流媒体服务器
 
-## 项目特点
+### 项目特点
 
 - 支持rtsp推流，http-flv，hls，rtsp拉流
 - 支持linux、macos、windows平台
+- 代码清晰，无任何依赖
+
+
+### 编译代码
+```console
+$ git clone https://github.com/xfxhn/mediaServer
+$ cd mediaServer && mkdir build && cd build
+$ cmake .. && make -j
+```
+
+
+### 使用 FFmpeg 推流
+现在暂时只支持rtsp over tcp的推流
+```bash
+ffmpeg -re -i "test.mp4" -vcodec h264 -acodec aac -f rtsp -rtsp_transport tcp rtsp://127.0.0.1/live/test
+```
+
+
+### 播放直播流
+#### flv 流格式
+```bash
+ffplay http://localhost/live/test.flv
+```
+
+#### hls 流格式
+```bash
+ffplay http://localhost/live/test/test.m3u8
+```
+
+#### rtsp 流格式
+```bash
+ffplay rtsp://localhost/live/test -rtsp_transport tcp
+```
+
+
 
 ****
 

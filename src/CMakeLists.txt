@@ -23,3 +23,4 @@ target_include_directories(mediaServer
         )
 
 target_link_libraries(mediaServer PRIVATE server)
+

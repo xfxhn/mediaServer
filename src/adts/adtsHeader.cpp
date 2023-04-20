@@ -2,8 +2,8 @@
 #include "adtsHeader.h"
 
 #include <cstdio>
-#include "readStream.h"
-#include "writeStream.h"
+#include "bitStream/readStream.h"
+#include "bitStream/writeStream.h"
 
 enum AudioObjectType {
     Main = 0,
