@@ -35,7 +35,7 @@ ffplay http://localhost/live/test/test.m3u8
 
 #### rtsp 流格式
 ```bash
-ffplay rtsp://localhost/live/test -rtsp_transport tcp
+ffplay rtsp://127.0.0.1/live/test -rtsp_transport tcp
 ```
 
 

@@ -66,7 +66,6 @@ int AVReadPacket::readTransportStream(bool videoFlag, bool audioFlag) {
 
             /*表示这个文件读完了，读下一个*/
             fs.close();
-            printf("读取%s文件 读取的size = %d video\n", name.c_str(), size);
             fs.open(path + name, std::ios::out | std::ios::binary);
             if (!fs.is_open()) {
                 fprintf(stderr, "读取%s失败 video\n", name.c_str());
