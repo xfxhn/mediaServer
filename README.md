@@ -10,6 +10,9 @@
 ### 编译代码
 ```console
 $ git clone https://github.com/xfxhn/mediaServer
+// win
+$ 使用VS打开空项目,再从 文件->打开->Cmake 选中 ./mediaServer/CMakeLists.txt 文件,打开项目
+// linux or mac
 $ cd mediaServer && mkdir build && cd build
 $ cmake .. && make -j
 ```

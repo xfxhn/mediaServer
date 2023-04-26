@@ -2,7 +2,9 @@
 project(mediaServer)
 
 
-#add_compile_options("/utf-8")
+if(MSVC)
+  add_compile_options("/utf-8")
+endif()
 
 add_compile_definitions("_CRT_SECURE_NO_WARNINGS")
 

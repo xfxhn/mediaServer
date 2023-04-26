@@ -1,7 +1,10 @@
-﻿.idea
-cmake-build-debug-mingw
-cmake-build-debug
-.vs
-out
-CMakeSettings.json
+﻿/.idea
+/cmake-build-debug-mingw
+/cmake-build-debug
+/.vs
+/.vscode
+/out
+/build
 /resource
+
+CMakeSettings.json
