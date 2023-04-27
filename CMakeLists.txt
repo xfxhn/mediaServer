@@ -2,12 +2,13 @@
 project(mediaServer)
 
 
-message(STATUS ${CMAKE_BUILD_TYPE}11122)
 set(CMAKE_INSTALL_PREFIX "${PROJECT_SOURCE_DIR}/${CMAKE_BUILD_TYPE}")
+if (MSVC)
+    add_compile_definitions("_CRT_SECURE_NO_WARNINGS")
+    add_compile_options("/utf-8")
+endif ()
 
-#add_compile_options("/utf-8")
 
-add_compile_definitions("_CRT_SECURE_NO_WARNINGS")
 
 set(CMAKE_CXX_STANDARD 17)
 ##cpp11标准
