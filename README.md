@@ -10,8 +10,9 @@
 ### 编译代码
 ```console
 $ git clone https://github.com/xfxhn/mediaServer
-$ cd mediaServer && mkdir build && cd build
-$ cmake .. && make -j
+$ cd mediaServer
+$ cmake -D CMAKE_BUILD_TYPE="Debug" -S . -B build
+$ cmake --build build --target install
 ```
 
 
